@@ -32,13 +32,15 @@ typedef struct _item_set
 } item_set;
 
 ht_node *c_init (FILE *f);
-void ht_insert (int *insert_item, int item_size, ht_node *node, bool needcount);
+void ht_insert (int *insert_item, int item_size,
+                ht_node *node, bool needcount);
 item_set *create_item_set (int *item, int item_size);
 ht_node *create_ht_node (int depth, int len);
 ht_node *create_leaf_node (item_set *items, int depth);
 void append_item_set (item_set *new_items, ht_node *leaf);
 void print_ht_tree (ht_node *node);
-void combination_and_insert_ht (int *ary, int ary_size, int len, int index, int *data, ht_node *root);
+void combination_and_insert_ht (int *ary, int ary_size, int len, int index,
+                                int *data, ht_node *root, bool needcount);
 void test();
 item_set *gen_largeitemset (ht_node *root);
 
@@ -137,7 +139,8 @@ c_init (FILE *f)
         len = get_transactions (f, &t_ary);
         if (len >= NUM_OF_INIT_CANDIDATE)
         {
-            combination_and_insert_ht (t_ary, len, NUM_OF_INIT_CANDIDATE, 0, data, root);
+            combination_and_insert_ht (t_ary, len, NUM_OF_INIT_CANDIDATE,
+                                       0, data, root, true);
         }
     }
     print_ht_tree (root);
@@ -354,19 +357,21 @@ print_ht_tree (ht_node *node)
 
 
 void
-combination_and_insert_ht (int *ary, int ary_size, int len, int index, int *data, ht_node *root)
+combination_and_insert_ht (int *ary, int ary_size, int len, int index,
+                           int *data, ht_node *root, bool needcount)
 {
     int i;
     if (len == 0)
     {
-        ht_insert (data, index, root, true);
+        ht_insert (data, index, root, needcount);
         printf ("\n");
         return;
     }
     for (i = 0; i <= ary_size - len; i++)
     {
         data[index] = ary[i];
-        combination_and_insert_ht (&ary[i + 1], ary_size - i - 1, len - 1, index + 1, data, root);
+        combination_and_insert_ht (&ary[i + 1], ary_size - i - 1, len - 1,
+                                   index + 1, data, root, needcount);
     }
 }
 
