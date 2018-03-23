@@ -32,6 +32,12 @@ typedef struct _item_set
     int *items;
 } item_set;
 
+typedef struct _item_list
+{
+    item_set *item;
+    struct _item_list *next_item_list;
+} item_list;
+
 ht_node *c_init (FILE *f);
 void ht_insert (int *insert_item, int item_size,
                 ht_node *node, bool needcount);
@@ -44,8 +50,11 @@ void combination_and_insert_ht (int *ary, int ary_size, int len, int index,
                                 int *data, ht_node *root, bool needcount);
 void gen_largeitemset (ht_node *node, ht_node *result_node);
 
-ht_node *apriori_gen (ht_node *large_item_set);
+void apriori_gen (ht_node *large_item_set, ht_node *result_node);
 int get_transactions (FILE *f, int **ary);
+void list_add (item_list *list, item_set *item);
+void gen_ht_item_list (ht_node *node, item_list *large_item_list);
+
 void print_ary (int *ary, int len);
 void test();
 
@@ -56,7 +65,7 @@ int main (int argc, char *argv[])
     ht_node *large_item_set;
     ht_node *candidate;
 
-    printf ("start initialize c\n"); 
+    printf ("start initialize c\n");
     f = fopen ("./T15I7N0.5KD1K.data", "rb");
     if (f == NULL)
     {
@@ -76,7 +85,8 @@ int main (int argc, char *argv[])
     large_item_set = create_ht_node (0, 0);
     gen_largeitemset (candidate, large_item_set);
     free (candidate);
-    candidate = apriori_gen (large_item_set);
+    candidate = create_ht_node (0, 0);
+    apriori_gen (large_item_set, candidate);
     return 0;
 }
 
@@ -422,7 +432,90 @@ gen_largeitemset (ht_node *node, ht_node *result_node)
 }
 
 
-ht_node *
-apriori_gen (ht_node *large_item_set)
+void
+apriori_gen (ht_node *large_item_set, ht_node *result_node)
 {
+    item_list *large_item_list;
+    large_item_list = (item_list *) malloc (sizeof (item_list));
+    memset (large_item_list, 0, sizeof (item_list));
+    gen_ht_item_list (large_item_set, large_item_list);
+
+    item_list *list_i, *list_j;
+    int cmp_size;
+    int *candidate;
+    cmp_size = large_item_list->next_item_list->item->size - 1;
+    candidate = (int *) malloc (sizeof (int) * (cmp_size + 2));
+    for (list_i = large_item_list->next_item_list; list_i != NULL;
+         list_i = list_i->next_item_list)
+    {
+        for (list_j = large_item_list->next_item_list; list_j != NULL;
+             list_j = list_j->next_item_list)
+        {
+            if (!memcmp (list_i->item, list_j->item, cmp_size * sizeof (int)))
+            { /* match */
+                if (list_i->item->items[cmp_size] < list_j->item->items[cmp_size])
+                { /* judge large list */
+                    memcpy (candidate, list_i->item->items, sizeof (int) * cmp_size);
+                    candidate[cmp_size] = list_i->item->items[cmp_size];
+                    candidate[cmp_size + 1] = list_j->item->items[cmp_size];
+                    if (ht_all_match (candidate, cmp_size + 2, large_item_set))
+                    {
+                        ht_insert(candidate, cmp_size + 2, result_node, false);
+                    }
+                }
+            }
+        }
+    }
+}
+
+bool ht_all_match (int *ary, int ary_size, ht_node *node)
+{
+    int hash_index;
+    int i;
+}
+
+void
+list_add (item_list *list, item_set *item)
+{
+    item_list *new_list;
+    new_list = (item_list *) malloc (sizeof (item_list));
+    memset (new_list, 0, sizeof (item_list));
+    new_list->item = item;
+    new_list->next_item_list = list->next_item_list;
+    list->next_item_list = new_list;
+}
+
+void
+gen_ht_item_list (ht_node *node, item_list *large_item_list)
+{
+    int i;
+    ht_node **nodes_ary;
+    item_set **item_set_ary;
+    if (node->len == 0) /* is interior node */
+    {
+        nodes_ary = (ht_node **) node->nodes;
+        for (i = 0; i < HASH_FUNC_MOD; i++)
+        {
+            if (nodes_ary[i] != NULL)
+            {
+                gen_ht_item_list (node, large_item_list);
+            }
+        }
+    }
+    else /* leaf node */
+    {
+        item_set_ary = (item_set **) node->nodes;
+        for (i = 0; i < MAX_LEAF_SIZE; i++)
+        {
+            if (item_set_ary[i] != NULL)
+            {
+                list_add (large_item_list, item_set_ary[i]);
+            }
+        }
+        if (node->next_leaf != NULL)
+        {
+            gen_ht_item_list (node->next_leaf, large_item_list);
+        }
+    }
+
 }
