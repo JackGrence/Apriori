@@ -42,57 +42,37 @@ void append_item_set (item_set *new_items, ht_node *leaf);
 void print_ht_tree (ht_node *node);
 void combination_and_insert_ht (int *ary, int ary_size, int len, int index,
                                 int *data, ht_node *root, bool needcount);
-void test();
-item_set *gen_largeitemset (ht_node *root);
+void gen_largeitemset (ht_node *node, ht_node *result_node);
 
 int get_transactions (FILE *f, int **ary);
 void print_ary (int *ary, int len);
+void test();
 
 
 int main (int argc, char *argv[])
 {
     FILE *f;
-    int len = 0;
-    int *t_ary = 0;
-    int *candidate;
-    int *large_item_set;
-    int i;
-    unsigned int min = -1;
-    candidate = (int *) malloc (sizeof (int) * NUM_OF_PRODUCT);
+    ht_node *large_item_set;
+    ht_node *candidate;
+
+    printf ("start initialize c\n"); 
     f = fopen ("./T15I7N0.5KD1K.data", "rb");
     if (f == NULL)
     {
         printf ("Open file error.\nexit...\n");
         exit(1);
     }
-    while (len != -1)
-    {
-        len = get_transactions (f, &t_ary);
-        min = (unsigned int) len < min ? len : min;
-        for (i = 0; i < len; i++)
-            candidate[t_ary[i]]++;
 
-        if (len != -1)
-            free (t_ary);
-    }
+    clock_t begin = clock();
+    candidate = c_init (f);
+    large_item_set = create_leaf_node (0, NUM_OF_INIT_CANDIDATE);
+    gen_largeitemset (candidate, large_item_set);
+    //print_ht_tree (large_item_set);
+    clock_t end = clock();
+    double spent = (double) (end - begin) / CLOCKS_PER_SEC;
+    printf ("Spent time: %fs\n", spent);
+
     fclose (f);
-
-    printf("min: %u\n", min);
-
-    len = 0;
-    large_item_set = (int *) malloc (sizeof (int) * NUM_OF_PRODUCT);
-    for (i = 0; i < NUM_OF_PRODUCT; i++)
-    {
-        if (candidate[i] >= MIN_SUP)
-        {
-            large_item_set[len] = i;
-            len++;
-        }
-    }
-    print_ary (large_item_set, len);
-    free (large_item_set);
-    
-    test();
     return 0;
 }
 
@@ -132,7 +112,6 @@ c_init (FILE *f)
     ht_node *root;
     int len = 0;
     int *t_ary;
-    int i;
     root = create_ht_node (0, 0);
     int data[NUM_OF_INIT_CANDIDATE];
     while (len != -1)
@@ -144,7 +123,7 @@ c_init (FILE *f)
                                        0, data, root, true);
         }
     }
-    print_ht_tree (root);
+    //print_ht_tree (root);
     return root;
 }
 
@@ -380,7 +359,6 @@ combination_and_insert_ht (int *ary, int ary_size, int len, int index,
 void
 test ()
 {
-    FILE *f;
     printf ("Test ht_insert\n");
     int ary[] = {0, 1, 2};
     int i;
@@ -397,23 +375,45 @@ test ()
         ht_insert (ary, 3, root, true);
     }
     //print_ht_tree (root);
-    printf ("start initialize c\n"); 
-    f = fopen ("./T15I7N0.5KD1K.data", "rb");
-    if (f == NULL)
-    {
-        printf ("Open file error.\nexit...\n");
-        exit(1);
-    }
-    clock_t begin = clock();
-    c_init (f);
-    clock_t end = clock();
-    double spent = (double) (end - begin) / CLOCKS_PER_SEC;
-    printf ("Spent time: %fs\n", spent);
-    fclose (f);
 }
 
 
-item_set *
-gen_largeitemset (ht_node *root)
+void
+gen_largeitemset (ht_node *node, ht_node *result_node)
 {
+    int i;
+    ht_node **nodes_ary;
+    item_set **item_set_ary;
+    if (node->len == 0) /* is interior node */
+    {
+        nodes_ary = (ht_node **) node->nodes;
+        for (i = 0; i < HASH_FUNC_MOD; i++)
+        {
+            if (nodes_ary[i] != NULL)
+            {
+                gen_largeitemset (nodes_ary[i], result_node);
+                free (nodes_ary[i]);
+            }
+        }
+    }
+    else /* leaf node */
+    {
+        item_set_ary = (item_set **) node->nodes;
+        for (i = 0; i < MAX_LEAF_SIZE; i++)
+        {
+            if (item_set_ary[i] != NULL)
+            {
+                if (item_set_ary[i]->count >= MIN_SUP)
+                    append_item_set (item_set_ary[i], result_node);
+                else
+                    free (item_set_ary[i]);
+            }
+        }
+        if (node->next_leaf != NULL)
+        {
+            gen_largeitemset (node->next_leaf, result_node);
+            free (node->next_leaf);
+        }
+    }
+    free (node->nodes);
 }
