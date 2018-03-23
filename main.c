@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <time.h>
 
 #define NUM_OF_PRODUCT 500
 #define HASH_FUNC_MOD 23
@@ -403,7 +404,11 @@ test ()
         printf ("Open file error.\nexit...\n");
         exit(1);
     }
+    clock_t begin = clock();
     c_init (f);
+    clock_t end = clock();
+    double spent = (double) (end - begin) / CLOCKS_PER_SEC;
+    printf ("Spent time: %fs\n", spent);
     fclose (f);
 }
 
