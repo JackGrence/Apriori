@@ -44,6 +44,7 @@ void combination_and_insert_ht (int *ary, int ary_size, int len, int index,
                                 int *data, ht_node *root, bool needcount);
 void gen_largeitemset (ht_node *node, ht_node *result_node);
 
+ht_node *apriori_gen (ht_node *large_item_set);
 int get_transactions (FILE *f, int **ary);
 void print_ary (int *ary, int len);
 void test();
@@ -65,14 +66,17 @@ int main (int argc, char *argv[])
 
     clock_t begin = clock();
     candidate = c_init (f);
-    large_item_set = create_leaf_node (0, NUM_OF_INIT_CANDIDATE);
-    gen_largeitemset (candidate, large_item_set);
     //print_ht_tree (large_item_set);
     clock_t end = clock();
     double spent = (double) (end - begin) / CLOCKS_PER_SEC;
     printf ("Spent time: %fs\n", spent);
 
     fclose (f);
+
+    large_item_set = create_ht_node (0, 0);
+    gen_largeitemset (candidate, large_item_set);
+    free (candidate);
+    candidate = apriori_gen (large_item_set);
     return 0;
 }
 
@@ -225,7 +229,7 @@ append_item_set (item_set *new_items, ht_node *leaf)
     item_set *enum_item;
     if (leaf->len <= 0)
     {
-        printf ("Isn't leaf node.\nreturn...");
+        printf ("Isn't leaf node.\nreturn...\n");
         return;
     }
 
@@ -344,7 +348,6 @@ combination_and_insert_ht (int *ary, int ary_size, int len, int index,
     if (len == 0)
     {
         ht_insert (data, index, root, needcount);
-        printf ("\n");
         return;
     }
     for (i = 0; i <= ary_size - len; i++)
@@ -404,9 +407,9 @@ gen_largeitemset (ht_node *node, ht_node *result_node)
             if (item_set_ary[i] != NULL)
             {
                 if (item_set_ary[i]->count >= MIN_SUP)
-                    append_item_set (item_set_ary[i], result_node);
-                else
-                    free (item_set_ary[i]);
+                    ht_insert (item_set_ary[i]->items, item_set_ary[i]->size,
+                               result_node, false);
+                free (item_set_ary[i]);
             }
         }
         if (node->next_leaf != NULL)
@@ -416,4 +419,10 @@ gen_largeitemset (ht_node *node, ht_node *result_node)
         }
     }
     free (node->nodes);
+}
+
+
+ht_node *
+apriori_gen (ht_node *large_item_set)
+{
 }
