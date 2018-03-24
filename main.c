@@ -48,12 +48,16 @@ void append_item_set (item_set *new_items, ht_node *leaf);
 void print_ht_tree (ht_node *node);
 void combination_and_insert_ht (int *ary, int ary_size, int len, int index,
                                 int *data, ht_node *root, bool needcount);
+void combination_and_create_list (int *ary, int ary_size, int len, int index,
+                                  int *data, item_list *list);
 void gen_largeitemset (ht_node *node, ht_node *result_node);
 
 void apriori_gen (ht_node *large_item_set, ht_node *result_node);
 int get_transactions (FILE *f, int **ary);
 void list_add (item_list *list, item_set *item);
 void gen_ht_item_list (ht_node *node, item_list *large_item_list);
+bool subset_belong_L (int *ary, int ary_size, item_list *large_item_list);
+void ht_count (int *ary, int ary_size, ht_node *node);
 
 void print_ary (int *ary, int len);
 void test();
@@ -76,9 +80,6 @@ int main (int argc, char *argv[])
     clock_t begin = clock();
     candidate = c_init (f);
     //print_ht_tree (large_item_set);
-    clock_t end = clock();
-    double spent = (double) (end - begin) / CLOCKS_PER_SEC;
-    printf ("Spent time: %fs\n", spent);
 
     fclose (f);
 
@@ -87,6 +88,11 @@ int main (int argc, char *argv[])
     free (candidate);
     candidate = create_ht_node (0, 0);
     apriori_gen (large_item_set, candidate);
+    print_ht_tree (candidate);
+
+    clock_t end = clock();
+    double spent = (double) (end - begin) / CLOCKS_PER_SEC;
+    printf ("Spent time: %fs\n", spent);
     return 0;
 }
 
@@ -451,14 +457,15 @@ apriori_gen (ht_node *large_item_set, ht_node *result_node)
         for (list_j = large_item_list->next_item_list; list_j != NULL;
              list_j = list_j->next_item_list)
         {
-            if (!memcmp (list_i->item, list_j->item, cmp_size * sizeof (int)))
+            if (!memcmp (list_i->item->items, list_j->item->items, cmp_size * sizeof (int)))
             { /* match */
                 if (list_i->item->items[cmp_size] < list_j->item->items[cmp_size])
                 { /* judge large list */
                     memcpy (candidate, list_i->item->items, sizeof (int) * cmp_size);
                     candidate[cmp_size] = list_i->item->items[cmp_size];
                     candidate[cmp_size + 1] = list_j->item->items[cmp_size];
-                    if (ht_all_match (candidate, cmp_size + 2, large_item_set))
+
+                    if (subset_belong_L (candidate, cmp_size + 2, large_item_list))
                     {
                         ht_insert(candidate, cmp_size + 2, result_node, false);
                     }
@@ -468,10 +475,52 @@ apriori_gen (ht_node *large_item_set, ht_node *result_node)
     }
 }
 
-bool ht_all_match (int *ary, int ary_size, ht_node *node)
+void
+combination_and_create_list (int *ary, int ary_size, int len, int index,
+                             int *data, item_list *list)
 {
-    int hash_index;
     int i;
+    if (len == 0)
+    {
+        list_add (list, create_item_set (data, index));
+        return;
+    }
+    for (i = 0; i <= ary_size - len; i++)
+    {
+        data[index] = ary[i];
+        combination_and_create_list (&ary[i + 1], ary_size - i - 1, len - 1,
+                                     index + 1, data, list);
+    }
+}
+
+bool
+subset_belong_L (int *ary, int ary_size, item_list *large_item_list)
+{
+    int *data;
+    item_list *list;
+    list = (item_list *) malloc (sizeof (item_list));
+    list->next_item_list = NULL;
+    data = (int *) malloc (sizeof (int) * ary_size - 1);
+    combination_and_create_list (ary, ary_size, ary_size - 1, 0, data, list);
+    item_list *list_i, *list_j;
+    bool match;
+    for (list_i = list->next_item_list; list_i != NULL;
+         list_i = list_i->next_item_list)
+    {
+        match = false;
+        for (list_j = large_item_list->next_item_list; list_j != NULL;
+             list_j = list_j->next_item_list)
+        {
+            if (!memcmp (list_i->item->items, list_j->item->items, sizeof (int) * (ary_size - 1)))
+            {
+                match = true;
+                break;
+            }
+        }
+        if (!match)
+            return false;
+    }
+    return true;
 }
 
 void
@@ -498,7 +547,7 @@ gen_ht_item_list (ht_node *node, item_list *large_item_list)
         {
             if (nodes_ary[i] != NULL)
             {
-                gen_ht_item_list (node, large_item_list);
+                gen_ht_item_list (nodes_ary[i], large_item_list);
             }
         }
     }
@@ -518,4 +567,35 @@ gen_ht_item_list (ht_node *node, item_list *large_item_list)
         }
     }
 
+}
+
+void
+ht_count (int *ary, int ary_size, ht_node *node)
+{
+    int hash_index;
+    ht_node *childnode;
+    int i;
+    item_set **item_set_ary;
+    if (node->len == 0) /* is interior node */
+    {
+        hash_index = ary[node->depth] % HASH_FUNC_MOD;
+        childnode = (ht_node *) node->nodes[hash_index];
+        if (childnode != NULL)
+        {
+            ht_count (ary, ary_size, childnode);
+        }
+    }
+    else  /* is leaf node */
+    {
+        /* search item */
+        item_set_ary = (item_set **) node->nodes;
+        for (i = 0; i < node->len; i++)
+        {
+            if (!memcmp(item_set_ary[i]->items, ary, sizeof (int) * node->depth))
+            {
+            }
+        }
+        if (node->next_leaf != NULL)
+            ht_count (ary, ary_size, node->next_leaf);
+    }
 }
