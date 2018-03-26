@@ -1,3 +1,5 @@
+/* version: 0.0 */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,9 +9,9 @@
 #define NUM_OF_PRODUCT 500
 #define HASH_FUNC_MOD 23
 #define MAX_LEAF_SIZE 10
-#define MIN_SUP 30000
+#define MIN_SUP 5
 #define NUM_OF_INIT_CANDIDATE 1
-#define FILE_NAME "./T15I7N0.5KD1000K.data"
+#define FILE_NAME "./T15I7N0.5KD1K.data"
 
 
 typedef struct hash_tree_node
@@ -68,9 +70,6 @@ void test();
 
 int main (int argc, char *argv[])
 {
-    //char a[10];
-    //test();
-    //gets(a);
     FILE *f;
     int candidate_size;
     ht_node *large_item_set;
@@ -87,7 +86,6 @@ int main (int argc, char *argv[])
     clock_t begin = clock();
     candidate = c_init (f);
     candidate_size = NUM_OF_INIT_CANDIDATE;
-    //print_ht_tree (large_item_set);
 
     fclose (f);
 
@@ -188,7 +186,6 @@ c_init (FILE *f)
         if (t_ary != NULL && len != -1)
             free (t_ary);
     }
-    //print_ht_tree (root);
     return root;
 }
 
