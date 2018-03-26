@@ -7,8 +7,9 @@
 #define NUM_OF_PRODUCT 500
 #define HASH_FUNC_MOD 23
 #define MAX_LEAF_SIZE 10
-#define MIN_SUP 5
-#define NUM_OF_INIT_CANDIDATE 2
+#define MIN_SUP 30000
+#define NUM_OF_INIT_CANDIDATE 1
+#define FILE_NAME "./T15I7N0.5KD1000K.data"
 
 
 typedef struct hash_tree_node
@@ -57,7 +58,9 @@ int get_transactions (FILE *f, int **ary);
 void list_add (item_list *list, item_set *item);
 void gen_ht_item_list (ht_node *node, item_list *large_item_list);
 bool subset_belong_L (int *ary, int ary_size, item_list *large_item_list);
-void ht_count (int *ary, int ary_size, ht_node *node);
+void ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary);
+bool all_in_ary (int *ary1, int ary1_size, int *ary2, int ary2_size);
+bool ht_is_empty (ht_node *node);
 
 void print_ary (int *ary, int len);
 void test();
@@ -65,12 +68,16 @@ void test();
 
 int main (int argc, char *argv[])
 {
+    //char a[10];
+    //test();
+    //gets(a);
     FILE *f;
+    int candidate_size;
     ht_node *large_item_set;
     ht_node *candidate;
 
     printf ("start initialize c\n");
-    f = fopen ("./T15I7N0.5KD1K.data", "rb");
+    f = fopen (FILE_NAME, "rb");
     if (f == NULL)
     {
         printf ("Open file error.\nexit...\n");
@@ -79,16 +86,52 @@ int main (int argc, char *argv[])
 
     clock_t begin = clock();
     candidate = c_init (f);
+    candidate_size = NUM_OF_INIT_CANDIDATE;
     //print_ht_tree (large_item_set);
 
     fclose (f);
 
-    large_item_set = create_ht_node (0, 0);
-    gen_largeitemset (candidate, large_item_set);
-    free (candidate);
-    candidate = create_ht_node (0, 0);
-    apriori_gen (large_item_set, candidate);
-    print_ht_tree (candidate);
+    for (candidate_size = NUM_OF_INIT_CANDIDATE + 1; !ht_is_empty (candidate); candidate_size++)
+    {
+        printf ("++++++++++++++++++\n");
+        print_ht_tree (candidate);
+        printf ("++++++++++++++++++\n");
+        large_item_set = create_ht_node (0, 0);
+        gen_largeitemset (candidate, large_item_set);
+        free (candidate);
+        if (ht_is_empty (large_item_set))
+            break;
+        //else
+        //{
+        //    printf ("++++++++++++++++++\n");
+        //    print_ht_tree (large_item_set);
+        //    printf ("++++++++++++++++++\n");
+        //}
+        candidate = create_ht_node (0, 0);
+        apriori_gen (large_item_set, candidate);
+        f = fopen (FILE_NAME, "rb");
+        if (f == NULL)
+        {
+            printf ("Open file error.\nexit...\n");
+            exit(1);
+        }
+        int len = 0;
+        int *t_ary;
+        int *ht_count_prefix_ary;
+        ht_count_prefix_ary = (int *) malloc (sizeof (int) * candidate_size);
+        while (len != -1)
+        {
+            len = get_transactions (f, &t_ary);
+            if (len >= candidate_size)
+            {
+                ht_count (t_ary, len, candidate, candidate_size, ht_count_prefix_ary);
+            }
+            if (t_ary != NULL && len != -1)
+                free (t_ary);
+        }
+        fclose (f);
+        free (ht_count_prefix_ary);
+    }
 
     clock_t end = clock();
     double spent = (double) (end - begin) / CLOCKS_PER_SEC;
@@ -142,6 +185,8 @@ c_init (FILE *f)
             combination_and_insert_ht (t_ary, len, NUM_OF_INIT_CANDIDATE,
                                        0, data, root, true);
         }
+        if (t_ary != NULL && len != -1)
+            free (t_ary);
     }
     //print_ht_tree (root);
     return root;
@@ -379,20 +424,28 @@ void
 test ()
 {
     printf ("Test ht_insert\n");
-    int ary[] = {0, 1, 2};
+    int ary[] = {0, 3};
+    int ary2[] = {0, 1, 2, 3, 4};
+    int prefix[3];
     int i;
     ht_node *root;
     root = create_ht_node (0, 0);
-    for (i = 0; i < 10; i++)
-        ht_insert (ary, 3, root, false);
-    printf ("count: %d\n", ((item_set *) ((ht_node *) root->nodes[0])->nodes[0])->count);
+    ht_insert (ary, 2, root, false);
+    ary[1] = 2;
+    ht_insert (ary, 2, root, false);
+    ht_count (ary2, 5, root, 2, prefix);
+    ht_count (ary2, 5, root, 2, prefix);
+    print_ht_tree (root);
+    //for (i = 0; i < 10; i++)
+    //    ht_insert (ary, 3, root, false);
+    //printf ("count: %d\n", ((item_set *) ((ht_node *) root->nodes[0])->nodes[0])->count);
 
-    printf ("Test ht_insert2\n");
-    for (i = 0; i <= 23 * 33; i += 23)
-    {
-        ary[0] = i;
-        ht_insert (ary, 3, root, true);
-    }
+    //printf ("Test ht_insert2\n");
+    //for (i = 0; i <= 23 * 33; i += 23)
+    //{
+    //    ary[0] = i;
+    //    ht_insert (ary, 3, root, true);
+    //}
     //print_ht_tree (root);
 }
 
@@ -570,19 +623,24 @@ gen_ht_item_list (ht_node *node, item_list *large_item_list)
 }
 
 void
-ht_count (int *ary, int ary_size, ht_node *node)
+ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
 {
     int hash_index;
     ht_node *childnode;
     int i;
     item_set **item_set_ary;
+
     if (node->len == 0) /* is interior node */
     {
-        hash_index = ary[node->depth] % HASH_FUNC_MOD;
-        childnode = (ht_node *) node->nodes[hash_index];
-        if (childnode != NULL)
+        for (i = 0; i <= ary_size - item_size; i++)
         {
-            ht_count (ary, ary_size, childnode);
+            prefix_ary[node->depth] = ary[i];
+            hash_index = ary[i] % HASH_FUNC_MOD;
+            childnode = (ht_node *) node->nodes[hash_index];
+            if (childnode != NULL)
+            {
+                ht_count (&ary[i + 1], ary_size - i - 1, childnode, item_size, prefix_ary);
+            }
         }
     }
     else  /* is leaf node */
@@ -591,11 +649,49 @@ ht_count (int *ary, int ary_size, ht_node *node)
         item_set_ary = (item_set **) node->nodes;
         for (i = 0; i < node->len; i++)
         {
-            if (!memcmp(item_set_ary[i]->items, ary, sizeof (int) * node->depth))
+            if (!memcmp(item_set_ary[i]->items, prefix_ary, sizeof (int) * node->depth))
             {
+                if (all_in_ary (&item_set_ary[i]->items[node->depth],
+                                item_set_ary[i]->size - node->depth,
+                                ary, ary_size))
+                {
+                    item_set_ary[i]->count++;
+                }
             }
         }
         if (node->next_leaf != NULL)
-            ht_count (ary, ary_size, node->next_leaf);
+            ht_count (ary, ary_size, node->next_leaf, item_size, prefix_ary);
     }
+}
+
+bool
+all_in_ary (int *ary1, int ary1_size, int *ary2, int ary2_size)
+{ /* ary1 all in ary2. ary2_size > ary1_size */
+    int i, j;
+    bool result;
+    for (i = 0; i < ary1_size; i++)
+    {
+        result = false;
+        for (j = 0; j < ary2_size; j++)
+        {
+            if (ary1[i] == ary2[j])
+            {
+                result = true;
+                break;
+            }
+        }
+        if (!result)
+        {
+            return false;
+        }
+    }
+    return result;
+}
+
+bool
+ht_is_empty (ht_node *node)
+{
+    char null_str[HASH_FUNC_MOD * sizeof (int)];
+    memset (null_str, 0, HASH_FUNC_MOD * sizeof (int));
+    return !memcmp (null_str, node->nodes, HASH_FUNC_MOD * sizeof (int));
 }
