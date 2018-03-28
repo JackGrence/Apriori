@@ -109,3 +109,22 @@ free_tableList (table_list *victim)
         free_tableList (victim->next_table);
     free (victim);
 }
+
+void
+tableL_insert (int val, table_list *des, bool needcount)
+{
+    div_t val_pos;
+    int i;
+
+    val_pos = div (val, TABLE_LIST_SIZE);
+    for (i = 0; i < val_pos.quot; i++)
+    {
+        if (des->next_table == NULL)
+        {
+            des->next_table = create_tableList();
+        }
+        des = des->next_table;
+    }
+    if (needcount)
+        des->table[val_pos.rem]++;
+}

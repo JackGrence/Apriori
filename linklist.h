@@ -30,5 +30,6 @@ void free_item_list_and_item (item_list *start);
 void free_item (item_set *item);
 table_list *create_tableList (void);
 void free_tableList (table_list *victim);
+void tableL_insert (int val, table_list *des, bool needcount);
 
 #endif
