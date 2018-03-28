@@ -5,71 +5,22 @@
 #include <string.h>
 #include <stdbool.h>
 #include <time.h>
+#include "hash_tree.h"
+#include "linklist.h"
+#include "display.h"
 
-#define NUM_OF_PRODUCT 500
-#define HASH_FUNC_MOD 51
-#define MAX_LEAF_SIZE 51
-#define NUM_OF_INIT_CANDIDATE 1
 //#define MIN_SUP 5
 //#define FILE_NAME "./T15I7N0.5KD1K.data"
 
 
-typedef struct hash_tree_node
-{
-    /* if len == 0 represent that is interior node,
-     * else it's number of leaf.
-     * nodes point to a node array or items.
-     * if len > MAX_LEAF_SIZE and in max depth,
-     * next_leaf point to extend leaf.
-     */
-    int depth;
-    int len;
-    void **nodes;
-    struct hash_tree_node *next_leaf;
-} ht_node;
 
-typedef struct _item_set
-{
-    int count;
-    int size;
-    int *items;
-} item_set;
 
-typedef struct _item_list
-{
-    item_set *item;
-    struct _item_list *next_item_list;
-} item_list;
-
-ht_node *c_init (FILE *f);
-void ht_insert (int *insert_item, int item_size,
-                ht_node *node, bool needcount);
-item_set *create_item_set (int *item, int item_size);
-ht_node *create_ht_node (int depth, int len);
-ht_node *create_leaf_node (item_set *items, int depth);
-void append_item_set (item_set *new_items, ht_node *leaf);
-void print_ht_tree (ht_node *node);
-void combination_and_insert_ht (int *ary, int ary_size, int len, int index,
-                                int *data, ht_node *root, bool needcount);
-void combination_and_create_list (int *ary, int ary_size, int len, int index,
-                                  int *data, item_list *list);
+ht_node * c_init (FILE *f);
 void gen_largeitemset (ht_node *node, ht_node *result_node);
-
 void apriori_gen (ht_node *large_item_set, ht_node *result_node);
 int get_transactions (FILE *f, int **ary);
-void list_add (item_list *list, item_set *item);
-void gen_ht_item_list (ht_node *node, item_list *large_item_list);
 bool subset_belong_L (int *ary, int ary_size, item_list *large_item_list);
-void ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary);
-bool all_in_ary (int *ary1, int ary1_size, int *ary2, int ary2_size);
-bool ht_is_empty (ht_node *node);
-int show_items_from_ht (ht_node *node);
-void free_item_list (item_list *start);
-void free_item_list_and_item (item_list *start);
-void free_item (item_set *item);
 
-void print_ary (int *ary, int len);
-void print_item_list (item_list *start);
 void test();
 
 char *FILE_NAME;
@@ -186,17 +137,6 @@ get_transactions (FILE *f, int **ary)
 }
 
 
-void
-print_ary (int *ary, int len)
-{
-    int i;
-    printf ("[ ");
-    for (i = 0; i < len; i++)
-    {
-        printf ("%d ", ary[i]);
-    }
-    printf ("]\n");
-}
 
 
 ht_node *
@@ -226,234 +166,14 @@ c_init (FILE *f)
     return root;
 }
 
-void
-ht_insert (int *insert_item, int item_size, ht_node *node, bool needcount)
-{
-    int hash_index;
-    ht_node *childnode;
-    int i;
-    int match;
-    item_set *new_items;
-    if (node->len == 0) /* is interior node */
-    {
-        hash_index = insert_item[node->depth] % HASH_FUNC_MOD;
-        childnode = (ht_node *) node->nodes[hash_index];
-        if (childnode == NULL)
-        {
-            /* create leaf node */
-            new_items = create_item_set (insert_item, item_size);
-            new_items->count = needcount ? 1 : 0;
-            node->nodes[hash_index] =
-                create_leaf_node (new_items, node->depth + 1);
-        }
-        else
-        {
-            ht_insert (insert_item, item_size, childnode, needcount);
-        }
-    }
-    else  /* is leaf node */
-    {
-        /* search item */
-        childnode = node;
-        while (childnode != NULL)
-        {
-            for (i = 0; i < MAX_LEAF_SIZE; i++)
-            {
-                if (childnode->nodes[i] != NULL)
-                    match = memcmp (insert_item,
-                                    ((item_set *)childnode->nodes[i])->items,
-                                    sizeof (int) * item_size);
-
-                if (match == 0)
-                    break;
-            }
-
-            if (match == 0)
-            {
-                /* count++ */
-                if (needcount)
-                    ((item_set *) childnode->nodes[i])->count++;
-                break;
-            }
-            else if (childnode->next_leaf == NULL)
-            {
-                new_items = create_item_set (insert_item, item_size);
-                new_items->count = needcount ? 1 : 0;
-                append_item_set (new_items, childnode);
-                break;
-            }
-            childnode = childnode->next_leaf;
-        }
-    }
-}
 
 
-ht_node *
-create_ht_node (int depth, int len)
-{
-    ht_node *new_node;
-    new_node = (ht_node *) malloc (sizeof (ht_node));
-    memset (new_node, 0, sizeof (ht_node));
-    new_node->depth = depth;
-    new_node->len = len;
-    new_node->nodes = (void **) malloc(sizeof (void *) * HASH_FUNC_MOD);
-    memset (new_node->nodes, 0, sizeof (void *) * HASH_FUNC_MOD);
-    return new_node;
-}
 
 
-item_set *
-create_item_set (int *item, int item_size)
-{
-    item_set *new_set;
-    new_set = (item_set *) malloc (sizeof (item_set));
-    new_set->count = 0;
-    new_set->size = item_size;
-    new_set->items = (int *) malloc (sizeof (int) * item_size);
-    memcpy (new_set->items, item, sizeof (int) * item_size);
-    return new_set;
-}
 
 
-void
-append_item_set (item_set *new_items, ht_node *leaf)
-{
-    /* judge leaf size, split or extend. */
-    ht_node **new_nodes;
-    int i;
-    int hash_index;
-    item_set *enum_item;
-    if (leaf->len <= 0)
-    {
-        printf ("Isn't leaf node.\nreturn...\n");
-        exit(1);
-        return;
-    }
-
-    if (leaf->len == MAX_LEAF_SIZE)
-    {
-        if (leaf->depth == new_items->size)
-        {
-            /* extend leaf */
-            if (leaf->next_leaf == NULL)
-            {
-                leaf->next_leaf = create_leaf_node(new_items, leaf->depth);
-            }
-            else
-                append_item_set(new_items, leaf->next_leaf);
-        }
-        else
-        {
-            /* split */
-            new_nodes = (ht_node **) malloc(sizeof (void *) * HASH_FUNC_MOD);
-
-            memset (new_nodes, 0, sizeof (void *) * HASH_FUNC_MOD);
-            for (i = 0; i < MAX_LEAF_SIZE; i++)
-            {
-                enum_item = (item_set *) leaf->nodes[i];
-                hash_index = enum_item->items[leaf->depth] % HASH_FUNC_MOD;
-                if (new_nodes[hash_index] != NULL)
-                {
-                    append_item_set (enum_item, new_nodes[hash_index]);
-                }
-                else
-                {
-                    /* create leaf node */
-                    new_nodes[hash_index] =
-                        create_leaf_node (enum_item, leaf->depth + 1);
-                }
-            }
-
-            hash_index = new_items->items[leaf->depth] % HASH_FUNC_MOD;
-            if (new_nodes[hash_index] != NULL)
-                append_item_set (new_items, new_nodes[hash_index]);
-            else
-                new_nodes[hash_index] =
-                    create_leaf_node (new_items, leaf->depth + 1);
-
-            free (leaf->nodes);
-            leaf->nodes = (void **) new_nodes;
-            leaf->len = 0;
-        }
-    }
-    else
-    {
-        leaf->nodes[leaf->len] = new_items;
-        leaf->len++;
-    }
-}
-
-ht_node *
-create_leaf_node (item_set *items, int depth)
-{
-    ht_node *new_leaf_node;
-    new_leaf_node = create_ht_node (depth, 1);
-    new_leaf_node->nodes[0] = items;
-    return new_leaf_node;
-}
-
-void
-print_ht_tree (ht_node *node)
-{
-    int i;
-    int cnt;
-    ht_node **nodes_ary;
-    item_set **item_set_ary;
-    ht_node *current_node;
-    if (node->len == 0) /* is interior node */
-    {
-        nodes_ary = (ht_node **) node->nodes;
-        for (i = 0; i < HASH_FUNC_MOD; i++)
-        {
-            if (nodes_ary[i] != NULL)
-            {
-                printf ("Find interior node: %d, depth: %d\n", i, node->depth);
-                print_ht_tree (nodes_ary[i]);
-            }
-        }
-    }
-    else
-    {
-        current_node = node;
-        while (current_node != NULL)
-        {
-            printf ("Find leaf node.\ncontent:\n");
-            item_set_ary = (item_set **) current_node->nodes;
-            for (i = 0; i < MAX_LEAF_SIZE; i++)
-            {
-                if (item_set_ary[i] != NULL)
-                {
-                    printf ("Find items: %d\n[", i);
-                    for (cnt = 0; cnt < item_set_ary[i]->size; cnt++)
-                    {
-                        printf ("%d ", item_set_ary[i]->items[cnt]);
-                    }
-                    printf ("] count: %d\n", item_set_ary[i]->count);
-                }
-            }
-            current_node = current_node->next_leaf;
-        }
-    }
-}
 
 
-void
-combination_and_insert_ht (int *ary, int ary_size, int len, int index,
-                           int *data, ht_node *root, bool needcount)
-{
-    int i;
-    if (len == 0)
-    {
-        ht_insert (data, index, root, needcount);
-        return;
-    }
-    for (i = 0; i <= ary_size - len; i++)
-    {
-        data[index] = ary[i];
-        combination_and_insert_ht (&ary[i + 1], ary_size - i - 1, len - 1,
-                                   index + 1, data, root, needcount);
-    }
-}
 
 
 void
@@ -537,13 +257,6 @@ gen_largeitemset (ht_node *node, ht_node *result_node)
 }
 
 
-void
-print_item_list (item_list *start)
-{
-    print_ary (start->item->items, start->item->size);
-    if (start->next_item_list != NULL)
-        print_item_list (start->next_item_list);
-}
 
 void
 apriori_gen (ht_node *large_item_set, ht_node *result_node)
@@ -584,48 +297,7 @@ apriori_gen (ht_node *large_item_set, ht_node *result_node)
     free_item_list (large_item_list);
 }
 
-void
-free_item (item_set *item)
-{
-    free (item->items);
-    free (item);
-}
 
-void
-free_item_list (item_list *start)
-{
-    if (start->next_item_list != NULL)
-        free_item_list (start->next_item_list);
-    free (start);
-}
-
-void
-free_item_list_and_item (item_list *start)
-{
-    if (start->next_item_list != NULL)
-        free_item_list_and_item (start->next_item_list);
-    if (start->item != NULL)
-        free (start->item);
-    free (start);
-}
-
-void
-combination_and_create_list (int *ary, int ary_size, int len, int index,
-                             int *data, item_list *list)
-{
-    int i;
-    if (len == 0)
-    {
-        list_add (list, create_item_set (data, index));
-        return;
-    }
-    for (i = 0; i <= ary_size - len; i++)
-    {
-        data[index] = ary[i];
-        combination_and_create_list (&ary[i + 1], ary_size - i - 1, len - 1,
-                                     index + 1, data, list);
-    }
-}
 
 bool
 subset_belong_L (int *ary, int ary_size, item_list *large_item_list)
@@ -660,162 +332,10 @@ subset_belong_L (int *ary, int ary_size, item_list *large_item_list)
     return match;
 }
 
-void
-list_add (item_list *list, item_set *item)
-{
-    item_list *new_list;
-    new_list = (item_list *) malloc (sizeof (item_list));
-    memset (new_list, 0, sizeof (item_list));
-    new_list->item = item;
-    new_list->next_item_list = list->next_item_list;
-    list->next_item_list = new_list;
-}
-
-void
-gen_ht_item_list (ht_node *node, item_list *large_item_list)
-{
-    int i;
-    ht_node **nodes_ary;
-    item_set **item_set_ary;
-    if (node->len == 0) /* is interior node */
-    {
-        nodes_ary = (ht_node **) node->nodes;
-        for (i = 0; i < HASH_FUNC_MOD; i++)
-        {
-            if (nodes_ary[i] != NULL)
-            {
-                gen_ht_item_list (nodes_ary[i], large_item_list);
-            }
-        }
-    }
-    else /* leaf node */
-    {
-        item_set_ary = (item_set **) node->nodes;
-        for (i = 0; i < node->len; i++)
-        {
-            if (item_set_ary[i] != NULL)
-            {
-                list_add (large_item_list, item_set_ary[i]);
-            }
-        }
-        if (node->next_leaf != NULL)
-        {
-            gen_ht_item_list (node->next_leaf, large_item_list);
-        }
-    }
-
-}
-
-void
-ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
-{
-    int hash_index;
-    ht_node *childnode;
-    int i;
-    item_set **item_set_ary;
-
-    if (node->len == 0) /* is interior node */
-    {
-        for (i = 0; i <= ary_size - item_size + node->depth; i++)
-        {
-            prefix_ary[node->depth] = ary[i];
-            hash_index = ary[i] % HASH_FUNC_MOD;
-            childnode = (ht_node *) node->nodes[hash_index];
-            if (childnode != NULL)
-            {
-                ht_count (&ary[i + 1], ary_size - i - 1, childnode, item_size, prefix_ary);
-            }
-        }
-    }
-    else  /* is leaf node */
-    {
-        /* search item */
-        item_set_ary = (item_set **) node->nodes;
-        for (i = 0; i < MAX_LEAF_SIZE; i++)
-        {
-            if (item_set_ary[i] == NULL)
-                continue;
-            if (!memcmp(item_set_ary[i]->items, prefix_ary, sizeof (int) * node->depth))
-            {
-                if (item_size - node->depth == 0)
-                    item_set_ary[i]->count++;
-                else if (all_in_ary (&item_set_ary[i]->items[node->depth], item_size - node->depth,
-                                ary, ary_size))
-                    item_set_ary[i]->count++;
-            }
-        }
-        if (node->next_leaf != NULL)
-            ht_count (ary, ary_size, node->next_leaf, item_size, prefix_ary);
-    }
-}
-
-bool
-all_in_ary (int *ary1, int ary1_size, int *ary2, int ary2_size)
-{ /* ary1 all in ary2. ary2_size > ary1_size */
-    int i, j;
-    bool result;
-    for (i = 0; i < ary1_size; i++)
-    {
-        result = false;
-        for (j = 0; j < ary2_size; j++)
-        {
-            if (ary1[i] == ary2[j])
-            {
-                result = true;
-                break;
-            }
-        }
-        if (!result)
-        {
-            return false;
-        }
-    }
-    return result;
-}
-
-bool
-ht_is_empty (ht_node *node)
-{
-    //char null_str[HASH_FUNC_MOD * sizeof (int)];
-    //memset (null_str, 0, HASH_FUNC_MOD * sizeof (int));
-    void **null_str;
-    null_str = (void **) malloc(sizeof (void *) * HASH_FUNC_MOD);
-    memset (null_str, 0, sizeof (void *) * HASH_FUNC_MOD);
-    return !memcmp (null_str, node->nodes, HASH_FUNC_MOD * sizeof (void *));
-}
 
 
-int
-show_items_from_ht (ht_node *node)
-{
-    int item_num = 0;
-    int i;
-    ht_node **nodes_ary;
-    item_set **item_set_ary;
-    if (node->len == 0) /* interior node */
-    {
-        nodes_ary = (ht_node **) node->nodes;
-        for (i = 0; i < HASH_FUNC_MOD; i++)
-        {
-            if (nodes_ary[i] != NULL)
-            {
-                item_num += show_items_from_ht (nodes_ary[i]);
-            }
-        }
-    }
-    else
-    {
-        item_set_ary = (item_set **) node->nodes;
-        for (i = 0; i < MAX_LEAF_SIZE; i++)
-        {
-            if (item_set_ary[i] != NULL)
-            {
-                //print_ary (item_set_ary[i]->items, item_set_ary[i]->size);
-                item_num++;
-            }
-        }
-        if (node->next_leaf != NULL)
-            item_num += show_items_from_ht (node->next_leaf);
-    }
-    return item_num;
-}
+
+
+
+
+
