@@ -23,3 +23,21 @@ print_ary (int *ary, int len)
     }
     printf ("]\n");
 }
+
+void
+print_tableList (table_list *tableL)
+{
+    int cnt = 0;
+    int i;
+    while (tableL != NULL)
+    {
+        printf ("Find table: %d\n[ ", cnt);
+        for (i = 0; i < TABLE_LIST_SIZE; i++)
+        {
+            printf ("%d ", tableL->table[i]);
+        }
+        printf ("]\n");
+        tableL = tableL->next_table;
+        cnt++;
+    }
+}

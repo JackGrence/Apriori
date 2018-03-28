@@ -6,5 +6,6 @@
 
 void print_ary (int *ary, int len);
 void print_item_list (item_list *start);
+void print_tableList (table_list *tableL);
 
 #endif /* ifndef DISPLAY */
