@@ -128,3 +128,15 @@ tableL_insert (int val, table_list *des, bool needcount)
     if (needcount)
         des->table[val_pos.rem]++;
 }
+
+int
+get_tableL_val (int ind, table_list *tableL)
+{
+    div_t val_pos;
+    int i;
+
+    val_pos = div (ind, TABLE_LIST_SIZE);
+    for (i = 0; i < val_pos.quot; i++)
+        tableL = tableL->next_table;
+    return tableL->table[val_pos.rem];
+}
