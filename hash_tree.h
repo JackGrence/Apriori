@@ -45,4 +45,3 @@ bool ht_is_empty (ht_node *node);
 int show_items_from_ht (ht_node *node);
 
 #endif /* ifndef HASH_TREE */
-

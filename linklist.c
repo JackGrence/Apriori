@@ -92,3 +92,20 @@ list_add (item_list *list, item_set *item)
     new_list->next_item_list = list->next_item_list;
     list->next_item_list = new_list;
 }
+
+table_list *
+create_tableList (void)
+{
+    table_list *new_table;
+    new_table = (table_list *) malloc (sizeof (table_list));
+    memset (new_table, 0, sizeof (table_list));
+    return new_table;
+}
+
+void
+free_tableList (table_list *victim)
+{
+    if (victim->next_table != NULL)
+        free_tableList (victim->next_table);
+    free (victim);
+}
