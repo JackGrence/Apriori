@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <errno.h>
 #include <time.h>
 #include "hash_tree.h"
 #include "linklist.h"
@@ -12,24 +13,24 @@
 //#define MIN_SUP 5
 //#define FILE_NAME "./T15I7N0.5KD1K.data"
 
-
-
-
-ht_node * c_init (FILE *f);
-void gen_largeitemset (ht_node *node, ht_node *result_node);
-void apriori_gen (ht_node *large_item_set, ht_node *result_node);
-int get_transactions (FILE *f, int **ary);
 bool subset_belong_L (int *ary, int ary_size, item_list *large_item_list);
-
+ht_node * c_init (FILE *f);
+int gen_L1_and_C2(FILE *f, ht_node *C2);
+int get_transactions (FILE *f, int **ary);
+void apriori_gen (ht_node *large_item_set, ht_node *result_node);
+void gen_largeitemset (ht_node *node, ht_node *result_node);
 void test();
+void count_C (ht_node *C, int C_itemSize);
 
-char *FILE_NAME;
-int MIN_SUP;
+static char *FILE_NAME;
+static int MIN_SUP;
 
 int main (int argc, char *argv[])
 {
-    //char *a[1];
+    //FILE_NAME = argv[1];
+    //MIN_SUP = atoi (argv[2]);
     //test();
+    //char *a[1];
     //gets(a);
 
     FILE *f;
@@ -48,16 +49,28 @@ int main (int argc, char *argv[])
         exit(1);
     }
 
+    int item_num;
     clock_t begin = clock();
-    candidate = c_init (f);
-    candidate_size = NUM_OF_INIT_CANDIDATE;
-    int item_num = 0;
+    clock_t end;
+    double spent;
+    candidate = create_ht_node (0, 0);
+    item_num = gen_L1_and_C2 (f, candidate);
+    candidate_size = 2;
 
     fclose (f);
 
-    /* start generate C2 */
+    int len;
+    int *t_ary;
+    int *ht_count_prefix_ary;
+
+    /* start count C2 */
+    count_C (candidate, candidate_size);
+    end = clock();
+    spent = (double) (end - begin) / CLOCKS_PER_SEC;
+    printf ("Count C time: %fs\n", spent);
+
     //for (candidate_size = NUM_OF_INIT_CANDIDATE + 1; !ht_is_empty (candidate) && (candidate_size <= 3); candidate_size++)
-    for (candidate_size = NUM_OF_INIT_CANDIDATE + 1; !ht_is_empty (candidate); candidate_size++)
+    for (candidate_size = candidate_size + 1; !ht_is_empty (candidate); candidate_size++)
     {
         //printf ("==================\n");
         //print_ht_tree (candidate);
@@ -83,9 +96,7 @@ int main (int argc, char *argv[])
             printf ("Open file error.\nexit...\n");
             exit(1);
         }
-        int len = 0;
-        int *t_ary;
-        int *ht_count_prefix_ary;
+        len = 0;
         ht_count_prefix_ary = (int *) malloc (sizeof (int) * candidate_size);
         while (len != -1)
         {
@@ -101,8 +112,8 @@ int main (int argc, char *argv[])
         free (ht_count_prefix_ary);
     }
 
-    clock_t end = clock();
-    double spent = (double) (end - begin) / CLOCKS_PER_SEC;
+    end = clock();
+    spent = (double) (end - begin) / CLOCKS_PER_SEC;
     printf ("Spent time: %fs\n", spent);
     printf ("frq: %d\n", item_num);
     return 0;
@@ -179,29 +190,40 @@ c_init (FILE *f)
 void
 test ()
 {
-    printf ("Test ht_insert\n");
-    int ary[] = {0, 101, 103};
-    int ary2[] = {0, 1, 2, 25, 40, 55, 95, 101, 103, 128};
-    int prefix[3];
-    int i;
+    FILE *f;
     ht_node *root;
     root = create_ht_node (0, 0);
-    for (i = 0; i < 5; i++)
+    f = fopen (FILE_NAME, "rb");
+    if (f == NULL)
     {
-        ht_insert (ary, 3, root, false);
-        ary[0] += 5;
+        printf ("Open file error.\nexit...\n%s\n", strerror (errno));
+        exit(1);
     }
-    ary[0] = 0;
-    ary[1] = 2;
-    for (i = 0; i < 5; i++)
-    {
-        ht_insert (ary, 3, root, false);
-        ary[2] += 5;
-    }
-    ary[2] = 124;
-    ht_insert (ary, 3, root, false);
-    ht_count (ary2, 10, root, 3, prefix);
-    print_ht_tree (root);
+    gen_L1_and_C2 (f, root);
+    fclose (f);
+    //printf ("Test ht_insert\n");
+    //int ary[] = {0, 101, 103};
+    //int ary2[] = {0, 1, 2, 25, 40, 55, 95, 101, 103, 128};
+    //int prefix[3];
+    //int i;
+    //ht_node *root;
+    //root = create_ht_node (0, 0);
+    //for (i = 0; i < 5; i++)
+    //{
+    //    ht_insert (ary, 3, root, false);
+    //    ary[0] += 5;
+    //}
+    //ary[0] = 0;
+    //ary[1] = 2;
+    //for (i = 0; i < 5; i++)
+    //{
+    //    ht_insert (ary, 3, root, false);
+    //    ary[2] += 5;
+    //}
+    //ary[2] = 124;
+    //ht_insert (ary, 3, root, false);
+    //ht_count (ary2, 10, root, 3, prefix);
+    //print_ht_tree (root);
     //for (i = 0; i < 10; i++)
     //    ht_insert (ary, 3, root, false);
     //printf ("count: %d\n", ((item_set *) ((ht_node *) root->nodes[0])->nodes[0])->count);
@@ -332,10 +354,89 @@ subset_belong_L (int *ary, int ary_size, item_list *large_item_list)
     return match;
 }
 
+int
+gen_L1_and_C2(FILE *f, ht_node *C2)
+{
+    /* return L1 size */
+    int *t_ary;
+    int i;
+    int len = 0;
+    table_list *C1;
+    table_list *L1;
+    int L_ind;
+    int reach_max;
+    int C_item[2];
 
+    C1 = create_tableList();
+    while (len != -1)
+    {
+        len = get_transactions (f, &t_ary);
+        for (i = 0; i < len; i++)
+        {
+            tableL_insert (t_ary[i], C1, true);
+        }
+        if (t_ary != NULL && len != -1)
+            free (t_ary);
+    }
 
+    L1 = C1;
+    len = 0;
+    while (L1 != NULL)
+    {
+        for (i = 0; i < TABLE_LIST_SIZE; i++)
+        {
+            if (L1->table[i] >= MIN_SUP)
+            {
+                L1->table[len] = i;
+                len++;
+            }
+        }
+        L1 = L1->next_table;
+    }
+    L1 = C1;
+    reach_max = 0;
+    for (L_ind = 0; L_ind < len - 1; L_ind++)
+    {
+        C_item[0] = L1->table[L_ind % TABLE_LIST_SIZE];
+        reach_max++;
+        if (reach_max >= TABLE_LIST_SIZE)
+        {
+            L1 = L1->next_table;
+            reach_max = 0;
+        }
+        for (i = L_ind + 1; i < len; i++)
+        {
+            C_item[1] = L1->table[i % TABLE_LIST_SIZE];
+            ht_insert (C_item, 2, C2, false);
+        }
+    }
+    return len;
+}
 
-
-
-
-
+void
+count_C (ht_node *C, int C_itemSize)
+{
+    FILE *f;
+    int *prefix_ary;
+    int len;
+    int *t_ary;
+    f = fopen (FILE_NAME, "rb");
+    if (f == NULL)
+    {
+        printf ("Open file error.\nexit...\n");
+        exit(1);
+    }
+    len = 0;
+    prefix_ary = (int *) malloc (sizeof (int) * C_itemSize);
+    while (len != -1)
+    {
+        len = get_transactions (f, &t_ary);
+        if (len >= C_itemSize)
+        {
+            ht_count (t_ary, len, C, C_itemSize, prefix_ary);
+        }
+        if (t_ary != NULL && len != -1)
+            free (t_ary);
+    }
+    fclose (f);
+}
