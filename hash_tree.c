@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include "hash_tree.h"
+#include "linklist.h"
 
 void
 ht_insert (int *insert_item, int item_size, ht_node *node, bool needcount)
@@ -233,16 +234,22 @@ combination_and_insert_ht (int *ary, int ary_size, int len, int index,
 void
 ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
 {
-    int hash_index;
     ht_node *childnode;
+    int hash_index;
     int i;
+    int item_index;
+    int prefix_size;
+    int tableL_val;
     item_set **item_set_ary;
+
+    prefix_size = node->depth;
+    table_list *remain_aryTableL;
 
     if (node->len == 0) /* is interior node */
     {
-        for (i = 0; i <= ary_size - item_size + node->depth; i++)
+        for (i = 0; i <= ary_size - item_size + prefix_size; i++)
         {
-            prefix_ary[node->depth] = ary[i];
+            prefix_ary[prefix_size] = ary[i];
             hash_index = ary[i] % HASH_FUNC_MOD;
             childnode = (ht_node *) node->nodes[hash_index];
             if (childnode != NULL)
@@ -254,22 +261,38 @@ ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
     else  /* is leaf node */
     {
         /* search item */
+        remain_aryTableL = create_tableList();
+        for (i = 0; i < ary_size; i++)
+            tableL_insert (ary[i], remain_aryTableL, true);
+
         item_set_ary = (item_set **) node->nodes;
-        for (i = 0; i < MAX_LEAF_SIZE; i++)
+        for (i = 0; i < node->len; i++)
         {
             if (item_set_ary[i] == NULL)
                 continue;
-            if (!memcmp(item_set_ary[i]->items, prefix_ary, sizeof (int) * node->depth))
+            if (!memcmp(item_set_ary[i]->items, prefix_ary, sizeof (int) * prefix_size))
             {
-                if (item_size - node->depth == 0)
+                if (item_size == prefix_size) /* prefix size == item_size */
                     item_set_ary[i]->count++;
-                else if (all_in_ary (&item_set_ary[i]->items[node->depth], item_size - node->depth,
+                else if (all_in_ary (&item_set_ary[i]->items[prefix_size], item_size - prefix_size,
                                 ary, ary_size))
                     item_set_ary[i]->count++;
+                else
+                {
+                    for (item_index = prefix_size; item_index < item_size; item_index++)
+                    {
+                        tableL_val = get_tableL_val (item_set_ary[i]->items[item_index], remain_aryTableL);
+                        if (tableL_val == 0)
+                            break;
+                    }
+                    item_set_ary[i]->count += tableL_val;
+                }
             }
         }
+        free_tableList (remain_aryTableL);
         if (node->next_leaf != NULL)
             ht_count (ary, ary_size, node->next_leaf, item_size, prefix_ary);
+
     }
 }
 

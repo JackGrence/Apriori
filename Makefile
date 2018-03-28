@@ -21,7 +21,7 @@ display.o: display.h linklist.h hash_tree.h
 
 linklist.o: linklist.h hash_tree.h
 
-hash_tree.o: hash_tree.h
+hash_tree.o: hash_tree.h linklist.h
 
 clean:
 	-rm *.o
