@@ -274,9 +274,6 @@ ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
             {
                 if (item_size == prefix_size) /* prefix size == item_size */
                     item_set_ary[i]->count++;
-                else if (all_in_ary (&item_set_ary[i]->items[prefix_size], item_size - prefix_size,
-                                ary, ary_size))
-                    item_set_ary[i]->count++;
                 else
                 {
                     for (item_index = prefix_size; item_index < item_size; item_index++)
