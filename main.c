@@ -14,10 +14,12 @@
 //#define FILE_NAME "./T15I7N0.5KD1K.data"
 
 bool subset_belong_L (int *ary, int ary_size, item_list *large_item_list);
+bool guess_C_isCorrect (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary);
 ht_node * c_init (FILE *f);
 int gen_L1_and_C2(FILE *f, ht_node *C2);
 int get_transactions (FILE *f, int **ary);
-void apriori_gen (ht_node *large_item_set, ht_node *result_node);
+void apriori_gen (ht_node *L_copy, ht_node *large_item_set, int item_size, ht_node *result_node);
+void L_combination (ht_node *large_item_set, ht_node *region_node, int item_size, ht_node *result_node);
 void gen_largeitemset (ht_node *node, ht_node *result_node);
 void test();
 void count_C (ht_node *C, int C_itemSize);
@@ -33,6 +35,11 @@ int main (int argc, char *argv[])
     //char *a[1];
     //gets(a);
 
+    int item_num;
+    clock_t begin = clock();
+    clock_t end;
+    clock_t last;
+    double spent;
     FILE *f;
     int candidate_size;
     ht_node *large_item_set;
@@ -49,25 +56,18 @@ int main (int argc, char *argv[])
         exit(1);
     }
 
-    int item_num;
-    clock_t begin = clock();
-    clock_t end;
-    double spent;
     candidate = create_ht_node (0, 0);
     item_num = gen_L1_and_C2 (f, candidate);
+    printf ("L1 size: %d\n", item_num);
     candidate_size = 2;
 
     fclose (f);
-
-    int len;
-    int *t_ary;
-    int *ht_count_prefix_ary;
 
     /* start count C2 */
     count_C (candidate, candidate_size);
     end = clock();
     spent = (double) (end - begin) / CLOCKS_PER_SEC;
-    printf ("Count C time: %fs\n", spent);
+    printf ("Count C2 time: %fs\n", spent);
 
     //for (candidate_size = NUM_OF_INIT_CANDIDATE + 1; !ht_is_empty (candidate) && (candidate_size <= 3); candidate_size++)
     for (candidate_size = candidate_size + 1; !ht_is_empty (candidate); candidate_size++)
@@ -76,6 +76,12 @@ int main (int argc, char *argv[])
         //print_ht_tree (candidate);
         //printf ("==================\n");
         //printf ("%d\n", candidate_size);
+
+
+        end = clock();
+        spent = (double) (end - begin) / CLOCKS_PER_SEC;
+        printf ("Start generate L, now: %fs\n", spent);
+
         large_item_set = create_ht_node (0, 0);
         gen_largeitemset (candidate, large_item_set);
         free (candidate);
@@ -88,28 +94,23 @@ int main (int argc, char *argv[])
             printf ("%d\n", item_num);
             printf ("++++++++++++++++++\n");
         }
+
+        end = clock();
+        spent = (double) (end - begin) / CLOCKS_PER_SEC;
+        printf ("Start apriori generation, now: %fs\n", spent);
+
         candidate = create_ht_node (0, 0);
-        apriori_gen (large_item_set, candidate);
-        f = fopen (FILE_NAME, "rb");
-        if (f == NULL)
-        {
-            printf ("Open file error.\nexit...\n");
-            exit(1);
-        }
-        len = 0;
-        ht_count_prefix_ary = (int *) malloc (sizeof (int) * candidate_size);
-        while (len != -1)
-        {
-            len = get_transactions (f, &t_ary);
-            if (len >= candidate_size)
-            {
-                ht_count (t_ary, len, candidate, candidate_size, ht_count_prefix_ary);
-            }
-            if (t_ary != NULL && len != -1)
-                free (t_ary);
-        }
-        fclose (f);
-        free (ht_count_prefix_ary);
+        apriori_gen (large_item_set, large_item_set, candidate_size - 1, candidate);
+
+        end = clock();
+        spent = (double) (end - begin) / CLOCKS_PER_SEC;
+        printf ("Start count_C, now: %fs\n", spent);
+
+        count_C (candidate, candidate_size);
+
+        end = clock();
+        spent = (double) (end - begin) / CLOCKS_PER_SEC;
+        printf ("End loop cycle, now: %fs\n", spent);
     }
 
     end = clock();
@@ -259,7 +260,7 @@ gen_largeitemset (ht_node *node, ht_node *result_node)
     else /* leaf node */
     {
         item_set_ary = (item_set **) node->nodes;
-        for (i = 0; i < MAX_LEAF_SIZE; i++)
+        for (i = 0; i < node->len; i++)
         {
             if (item_set_ary[i] != NULL)
             {
@@ -279,46 +280,233 @@ gen_largeitemset (ht_node *node, ht_node *result_node)
 }
 
 
+bool
+guess_C_isCorrect (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
+{
+    ht_node *childnode;
+    int hash_index;
+    int i;
+    int item_index;
+    int prefix_size;
+    int tableL_val;
+    int match_cnt;
+    item_set **item_set_ary;
+
+    prefix_size = node->depth;
+    table_list *remain_aryTableL;
+
+    if (node->len == 0) /* is interior node */
+    {
+        for (i = 0; i <= ary_size - item_size + prefix_size; i++)
+        {
+            prefix_ary[prefix_size] = ary[i];
+            hash_index = ary[i] % HASH_FUNC_MOD;
+            childnode = (ht_node *) node->nodes[hash_index];
+            if (childnode != NULL)
+            {
+                return guess_C_isCorrect (&ary[i + 1], ary_size - i - 1, childnode, item_size, prefix_ary);
+            }
+        }
+    }
+    else  /* is leaf node */
+    {
+        /* search item */
+        remain_aryTableL = create_tableList();
+        for (i = 0; i < ary_size; i++)
+            tableL_insert (ary[i], remain_aryTableL, true);
+
+        match_cnt = 0;
+        while (node != NULL)
+        {
+            item_set_ary = (item_set **) node->nodes;
+            for (i = 0; i < node->len; i++)
+            {
+                if (item_set_ary[i] == NULL)
+                    continue;
+                if (!memcmp(item_set_ary[i]->items, prefix_ary, sizeof (int) * prefix_size))
+                {
+                    if (item_size == prefix_size) /* prefix size == item_size */
+                    {
+                        match_cnt++;
+                        break;
+                    }
+                    else
+                    {
+                        for (item_index = prefix_size; item_index < item_size; item_index++)
+                        {
+                            tableL_val = get_tableL_val (item_set_ary[i]->items[item_index], remain_aryTableL);
+                            if (tableL_val == 0)
+                                break;
+                        }
+                        match_cnt += tableL_val;
+                    }
+                }
+            }
+            node = node->next_leaf;
+        }
+        free_tableList (remain_aryTableL);
+        if (match_cnt != item_size - prefix_size + 1)
+            return false;
+    }
+    return true;
+}
+
 
 void
-apriori_gen (ht_node *large_item_set, ht_node *result_node)
+L_combination (ht_node *large_item_set, ht_node *region_node, int item_size, ht_node *result_node)
 {
-    item_list *large_item_list;
-    large_item_list = (item_list *) malloc (sizeof (item_list));
-    memset (large_item_list, 0, sizeof (item_list));
-    gen_ht_item_list (large_item_set, large_item_list);
-
-    item_list *list_i, *list_j;
     int cmp_size;
-    int *candidate;
-    cmp_size = large_item_list->next_item_list->item->size - 1;
-    candidate = (int *) malloc (sizeof (int) * (cmp_size + 2));
-    for (list_i = large_item_list->next_item_list; list_i != NULL;
-         list_i = list_i->next_item_list)
-    {
-        for (list_j = large_item_list->next_item_list; list_j != NULL;
-             list_j = list_j->next_item_list)
-        {
-            if (!memcmp (list_i->item->items, list_j->item->items, cmp_size * sizeof (int)))
-            { /* match */
-                if (list_i->item->items[cmp_size] < list_j->item->items[cmp_size])
-                { /* judge large list */
-                    memcpy (candidate, list_i->item->items, sizeof (int) * cmp_size);
-                    candidate[cmp_size] = list_i->item->items[cmp_size];
-                    candidate[cmp_size + 1] = list_j->item->items[cmp_size];
+    int item_set_ind;
+    int scan_ind;
+    int node_ind;
+    int *guess_C;
+    int *cmp_ary;
+    int *scan_ary;
+    int *prefix_ary;
+    ht_node **nodes_ary;
+    ht_node *leaf_node;
+    ht_node *concated_leafNode;
+    ht_node *last_node;
+    ht_node *scan_node;
+    item_set **item_set_ary;
+    guess_C = (int *) malloc (sizeof (int) * (item_size + 1));
+    prefix_ary = (int *) malloc (sizeof (int) * item_size);
 
-                    if (subset_belong_L (candidate, cmp_size + 2, large_item_list))
+    cmp_size = item_size - 1;
+    if (region_node->len == 0) /* interior node */
+    {
+        nodes_ary = (ht_node **) region_node->nodes;
+        concated_leafNode = NULL;
+        last_node = NULL;
+        for (node_ind = 0; node_ind < HASH_FUNC_MOD; node_ind++)
+        {
+            leaf_node = nodes_ary[node_ind];
+            if (leaf_node != NULL)
+            {
+                if (concated_leafNode == NULL)
+                    concated_leafNode = leaf_node; /* get first leaf node */
+
+                if (last_node != NULL)
+                {
+                    last_node->next_leaf = leaf_node;
+                }
+
+                while (leaf_node->next_leaf != NULL)
+                    leaf_node = leaf_node->next_leaf;
+
+                last_node = leaf_node;
+            }
+        }
+        L_combination (large_item_set, concated_leafNode, item_size, result_node);
+    }
+    else
+    {
+        item_set_ary = (item_set **) region_node->nodes;
+        for (item_set_ind = 0; item_set_ind < region_node->len; item_set_ind++) /* scan item_set_ary */
+        {
+            cmp_ary = item_set_ary[item_set_ind]->items;
+            if (item_set_ind == region_node->len - 1 && region_node->next_leaf != NULL)
+            { /* reach last item of leaf node && have next leaf node*/
+                item_set_ind = -1;
+                region_node = region_node->next_leaf;
+                item_set_ary = (item_set **) region_node->nodes;
+            }
+			scan_node = region_node;
+            for (scan_ind = item_set_ind + 1; scan_ind < scan_node->len; scan_ind++)
+            {
+                scan_ary = ((item_set *) scan_node->nodes[scan_ind])->items;
+                if (!memcmp (cmp_ary, scan_ary, sizeof (int) * cmp_size))
+                {
+                    memcpy (guess_C, cmp_ary, sizeof (int) * cmp_size);
+                    if (cmp_ary[cmp_size] < scan_ary[cmp_size])
                     {
-                        ht_insert(candidate, cmp_size + 2, result_node, false);
+                        guess_C[item_size - 1] = cmp_ary[cmp_size];
+                        guess_C[item_size] = scan_ary[cmp_size];
                     }
+                    else
+                    {
+                        guess_C[item_size - 1] = scan_ary[cmp_size];
+                        guess_C[item_size] = cmp_ary[cmp_size];
+                    }
+                    if (guess_C_isCorrect (guess_C, item_size + 1, large_item_set, item_size, prefix_ary))
+                        ht_insert (guess_C, item_size + 1, result_node, false);
+                }
+                if (scan_ind == scan_node->len - 1 && scan_node->next_leaf != NULL)
+                {
+                    scan_ind = -1;
+                    scan_node = scan_node->next_leaf;
                 }
             }
         }
     }
-
-    free_item_list (large_item_list);
+    free (prefix_ary);
+    free (guess_C);
 }
 
+
+void
+apriori_gen (ht_node *L_copy, ht_node *large_item_set, int item_size, ht_node *result_node)
+{
+    int node_ind;
+    ht_node **nodes_ary;
+    if (large_item_set->len == 0) /* interior node */
+    {
+        if (large_item_set->depth == item_size - 1)
+        {
+            L_combination (L_copy, large_item_set, item_size, result_node);
+        }
+        else
+        {
+            nodes_ary = (ht_node **) large_item_set->nodes;
+            for (node_ind = 0; node_ind < HASH_FUNC_MOD; node_ind++)
+            {
+                if (nodes_ary[node_ind] != NULL)
+                {
+                    apriori_gen (L_copy, nodes_ary[node_ind], item_size, result_node);
+                }
+            }
+        }
+    }
+    else
+    {
+        L_combination (L_copy, large_item_set, item_size, result_node);
+    }
+
+    //item_list *large_item_list;
+    //large_item_list = (item_list *) malloc (sizeof (item_list));
+    //memset (large_item_list, 0, sizeof (item_list));
+    //gen_ht_item_list (large_item_set, large_item_list);
+
+    //item_list *list_i, *list_j;
+    //int cmp_size;
+    //int *candidate;
+    //cmp_size = large_item_list->next_item_list->item->size - 1;
+    //candidate = (int *) malloc (sizeof (int) * (cmp_size + 2));
+    //for (list_i = large_item_list->next_item_list; list_i != NULL;
+    //     list_i = list_i->next_item_list)
+    //{
+    //    for (list_j = large_item_list->next_item_list; list_j != NULL;
+    //         list_j = list_j->next_item_list)
+    //    {
+    //        if (!memcmp (list_i->item->items, list_j->item->items, cmp_size * sizeof (int)))
+    //        { /* match */
+    //            if (list_i->item->items[cmp_size] < list_j->item->items[cmp_size])
+    //            { /* judge large list */
+    //                memcpy (candidate, list_i->item->items, sizeof (int) * cmp_size);
+    //                candidate[cmp_size] = list_i->item->items[cmp_size];
+    //                candidate[cmp_size + 1] = list_j->item->items[cmp_size];
+
+    //                if (subset_belong_L (candidate, cmp_size + 2, large_item_list))
+    //                {
+    //                    ht_insert(candidate, cmp_size + 2, result_node, false);
+    //                }
+    //            }
+    //        }
+    //    }
+    //}
+
+    //free_item_list (large_item_list);
+}
 
 
 bool
@@ -361,8 +549,10 @@ gen_L1_and_C2(FILE *f, ht_node *C2)
     int *t_ary;
     int i;
     int len = 0;
+    int cnt;
     table_list *C1;
     table_list *L1;
+    table_list *cur_table;
     int L_ind;
     int reach_max;
     int C_item[2];
@@ -380,15 +570,23 @@ gen_L1_and_C2(FILE *f, ht_node *C2)
     }
 
     L1 = C1;
+    cur_table = L1;
     len = 0;
+    cnt = 0;
     while (L1 != NULL)
     {
         for (i = 0; i < TABLE_LIST_SIZE; i++)
         {
             if (L1->table[i] >= MIN_SUP)
             {
-                L1->table[len] = i;
+                cur_table->table[cnt] = i;
                 len++;
+                cnt++;
+                if (cnt >= TABLE_LIST_SIZE)
+                {
+                    cnt = 0;
+                    cur_table = cur_table->next_table;
+                }
             }
         }
         L1 = L1->next_table;
@@ -439,4 +637,5 @@ count_C (ht_node *C, int C_itemSize)
             free (t_ary);
     }
     fclose (f);
+    free (prefix_ary);
 }
