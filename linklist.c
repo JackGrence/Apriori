@@ -137,6 +137,10 @@ get_tableL_val (int ind, table_list *tableL)
 
     val_pos = div (ind, TABLE_LIST_SIZE);
     for (i = 0; i < val_pos.quot; i++)
+    {
+        if (tableL->next_table == NULL)
+            return 0;
         tableL = tableL->next_table;
+    }
     return tableL->table[val_pos.rem];
 }
