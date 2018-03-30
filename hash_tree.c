@@ -116,50 +116,54 @@ append_item_set (item_set *new_items, ht_node *leaf)
         return;
     }
 
+    if (leaf->depth == new_items->size)
+    {
+        add_deepest_leaf (new_items, leaf);
+        return;
+    }
+
     if (leaf->len == MAX_LEAF_SIZE)
     {
-        if (leaf->depth == new_items->size)
+        /* split */
+        new_nodes = (ht_node **) malloc(sizeof (void *) * HASH_FUNC_MOD);
+
+        memset (new_nodes, 0, sizeof (void *) * HASH_FUNC_MOD);
+        for (i = 0; i < MAX_LEAF_SIZE; i++)
         {
-            /* extend leaf */
-            if (leaf->next_leaf == NULL)
+            enum_item = (item_set *) leaf->nodes[i];
+            hash_index = enum_item->items[leaf->depth] % HASH_FUNC_MOD;
+            if (new_nodes[hash_index] != NULL)
             {
-                leaf->next_leaf = create_leaf_node(new_items, leaf->depth);
+                append_item_set (enum_item, new_nodes[hash_index]);
             }
             else
-                append_item_set(new_items, leaf->next_leaf);
+            {
+                /* create leaf node */
+                new_nodes[hash_index] =
+                    create_leaf_node (enum_item, leaf->depth + 1);
+            }
         }
-        else
-        {
-            /* split */
-            new_nodes = (ht_node **) malloc(sizeof (void *) * HASH_FUNC_MOD);
 
-            memset (new_nodes, 0, sizeof (void *) * HASH_FUNC_MOD);
+        hash_index = new_items->items[leaf->depth] % HASH_FUNC_MOD;
+        if (new_nodes[hash_index] != NULL)
+            append_item_set (new_items, new_nodes[hash_index]);
+        else
+            new_nodes[hash_index] =
+                create_leaf_node (new_items, leaf->depth + 1);
+
+        free (leaf->nodes);
+        leaf->nodes = (void **) new_nodes;
+        leaf->len = 0;
+
+        if (leaf->depth + 1 == new_items->size)
+        { /* deepest leaf */
             for (i = 0; i < MAX_LEAF_SIZE; i++)
             {
-                enum_item = (item_set *) leaf->nodes[i];
-                hash_index = enum_item->items[leaf->depth] % HASH_FUNC_MOD;
-                if (new_nodes[hash_index] != NULL)
+                if (new_nodes[i] != NULL)
                 {
-                    append_item_set (enum_item, new_nodes[hash_index]);
-                }
-                else
-                {
-                    /* create leaf node */
-                    new_nodes[hash_index] =
-                        create_leaf_node (enum_item, leaf->depth + 1);
+                    cate_deepest_leaf (new_nodes[i], new_items->size - 1);
                 }
             }
-
-            hash_index = new_items->items[leaf->depth] % HASH_FUNC_MOD;
-            if (new_nodes[hash_index] != NULL)
-                append_item_set (new_items, new_nodes[hash_index]);
-            else
-                new_nodes[hash_index] =
-                    create_leaf_node (new_items, leaf->depth + 1);
-
-            free (leaf->nodes);
-            leaf->nodes = (void **) new_nodes;
-            leaf->len = 0;
         }
     }
     else
@@ -167,6 +171,103 @@ append_item_set (item_set *new_items, ht_node *leaf)
         leaf->nodes[leaf->len] = new_items;
         leaf->len++;
     }
+}
+
+void
+add_deepest_leaf (item_set *new_items, ht_node *leaf)
+{
+    int cmp_size;
+    int *cmp_ary;
+    int depth;
+    item_set **item_set_ary;
+    ht_node *prev_leaf;
+
+    depth = leaf->depth;
+    cmp_size = new_items->size - 1;
+    cmp_ary = (int *) malloc (sizeof (int) * cmp_size);
+    while (leaf != NULL)
+    {
+        item_set_ary = (item_set **) leaf->nodes;
+        memcpy (cmp_ary, item_set_ary[0]->items, sizeof (int) * cmp_size);
+        if (!memcmp (cmp_ary, new_items->items, sizeof (int) * cmp_size))
+        { /* match */
+            if (leaf->len == MAX_LEAF_SIZE)
+            {
+                prev_leaf = leaf;
+                leaf = leaf->next_leaf;
+            }
+            else
+            {
+                leaf->nodes[leaf->len] = new_items;
+                leaf->len++;
+                return;
+            }
+        }
+        else
+        {
+            prev_leaf = leaf;
+            leaf = leaf->next_leaf;
+        }
+    }
+    prev_leaf->next_leaf = create_leaf_node (new_items, depth);
+}
+
+void
+cate_deepest_leaf (ht_node *leaf, int cmp_size)
+{
+    ht_node *cur_leaf_node;
+    ht_node *new_leaf_node;
+    ht_node *orig_next_leaf;
+    int *cmp_ary;
+    int i;
+    int orig_leaf_len;
+    item_set **item_set_ary;
+
+    cmp_ary = (int *) malloc (sizeof (int) * cmp_size);
+    item_set_ary = (item_set **) leaf->nodes;
+    memcpy (cmp_ary, item_set_ary[0]->items, sizeof (int) * cmp_size);
+
+    orig_next_leaf = leaf->next_leaf;
+    orig_leaf_len = leaf->len;
+    cur_leaf_node = NULL;
+
+    for (i = 1; i < orig_leaf_len; i++)
+    {
+        if (memcmp (cmp_ary, item_set_ary[i]->items, sizeof (int) * cmp_size))
+        { /* no match */
+            new_leaf_node = create_leaf_node (item_set_ary[i], leaf->depth);
+            if (cur_leaf_node == NULL)
+            {
+                leaf->next_leaf = new_leaf_node;
+                leaf->len = i;
+            }
+            else
+                cur_leaf_node->next_leaf = new_leaf_node;
+            cur_leaf_node = new_leaf_node;
+            memcpy (cmp_ary, item_set_ary[i]->items, sizeof (int) * cmp_size);
+        }
+        else
+        {
+            if (cur_leaf_node != NULL)
+            {
+                if (cur_leaf_node->len == MAX_LEAF_SIZE)
+                {
+                    cur_leaf_node->next_leaf =
+                        create_leaf_node(item_set_ary[i], cur_leaf_node->depth);
+                    cur_leaf_node = cur_leaf_node->next_leaf;
+                }
+                else
+                {
+                    cur_leaf_node->nodes[cur_leaf_node->len] = item_set_ary[i];
+                    cur_leaf_node->len++;
+                }
+            }
+        }
+    }
+    if (cur_leaf_node != NULL)
+        cur_leaf_node->next_leaf = orig_next_leaf;
+    if (orig_next_leaf != NULL)
+        cate_deepest_leaf (orig_next_leaf, cmp_size);
 }
 
 void
@@ -270,7 +371,16 @@ ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
         {
             if (item_set_ary[i] == NULL)
                 continue;
-            if (!memcmp(item_set_ary[i]->items, prefix_ary, sizeof (int) * prefix_size))
+
+            if (item_size == prefix_size) /* at deepest leaf */
+            {
+                if (memcmp (item_set_ary[i]->items, prefix_ary, sizeof (int) * (prefix_size - 1)))
+                { /* no match */
+                    break;
+                }
+            }
+
+            if (!memcmp (item_set_ary[i]->items, prefix_ary, sizeof (int) * prefix_size))
             {
                 if (item_size == prefix_size) /* prefix size == item_size */
                 {
@@ -364,4 +474,18 @@ show_items_from_ht (ht_node *node)
             item_num += show_items_from_ht (node->next_leaf);
     }
     return item_num;
+}
+
+void
+free_leaf_node (ht_node *leaf)
+{ /* first leaf won't free */
+    int i;
+    for (i = 0; i < leaf->len; i++)
+        free (leaf->nodes[i]);
+    free (leaf->nodes);
+    if (leaf->next_leaf != NULL)
+    {
+        free_leaf_node (leaf->next_leaf);
+        free (leaf->next_leaf);
+    }
 }
