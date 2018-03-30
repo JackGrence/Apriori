@@ -358,6 +358,7 @@ L_combination (ht_node *large_item_set, ht_node *region_node, int item_size, ht_
     ht_node *concated_leafNode;
     ht_node *last_node;
     ht_node *scan_node;
+    ht_node *free_node;
     item_set **item_set_ary;
     guess_C = (int *) malloc (sizeof (int) * (item_size + 1));
     prefix_ary = (int *) malloc (sizeof (int) * item_size);
@@ -388,9 +389,12 @@ L_combination (ht_node *large_item_set, ht_node *region_node, int item_size, ht_
             }
         }
         L_combination (large_item_set, concated_leafNode, item_size, result_node);
+        free (concated_leafNode);
+        free (nodes_ary);
     }
     else
     {
+        free_node = region_node;
         item_set_ary = (item_set **) region_node->nodes;
         for (item_set_ind = 0; item_set_ind < region_node->len; item_set_ind++) /* scan item_set_ary */
         {
@@ -428,6 +432,7 @@ L_combination (ht_node *large_item_set, ht_node *region_node, int item_size, ht_
                 }
             }
         }
+        free_leaf_node (free_node);
     }
     free (prefix_ary);
     free (guess_C);
@@ -453,8 +458,10 @@ apriori_gen (ht_node *L_copy, ht_node *large_item_set, int item_size, ht_node *r
                 if (nodes_ary[node_ind] != NULL)
                 {
                     apriori_gen (L_copy, nodes_ary[node_ind], item_size, result_node);
+                    free (nodes_ary[node_ind]);
                 }
             }
+            free (nodes_ary);
         }
     }
     else
