@@ -365,3 +365,17 @@ show_items_from_ht (ht_node *node)
     }
     return item_num;
 }
+
+void
+free_leaf_node (ht_node *leaf)
+{ /* first leaf won't free */
+    int i;
+    for (i = 0; i < leaf->len; i++)
+        free (leaf->nodes[i]);
+    free (leaf->nodes);
+    if (leaf->next_leaf != NULL)
+    {
+        free_leaf_node (leaf->next_leaf);
+        free (leaf->next_leaf);
+    }
+}

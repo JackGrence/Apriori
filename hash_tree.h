@@ -43,5 +43,6 @@ void ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix
 bool all_in_ary (int *ary1, int ary1_size, int *ary2, int ary2_size);
 bool ht_is_empty (ht_node *node);
 int show_items_from_ht (ht_node *node);
+void free_leaf_node (ht_node *leaf);
 
 #endif /* ifndef HASH_TREE */
