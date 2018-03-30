@@ -72,10 +72,13 @@ int main (int argc, char *argv[])
     //for (candidate_size = NUM_OF_INIT_CANDIDATE + 1; !ht_is_empty (candidate) && (candidate_size <= 3); candidate_size++)
     for (candidate_size = candidate_size + 1; !ht_is_empty (candidate); candidate_size++)
     {
-        //printf ("==================\n");
-        //print_ht_tree (candidate);
-        //printf ("==================\n");
-        //printf ("%d\n", candidate_size);
+        if (candidate_size > 0)
+        {
+            printf ("==================\n");
+            print_ht_tree (candidate);
+            printf ("==================\n");
+            printf ("%d\n", candidate_size);
+        }
 
 
         end = clock();
@@ -556,6 +559,7 @@ gen_L1_and_C2(FILE *f, ht_node *C2)
     int L_ind;
     int reach_max;
     int C_item[2];
+    int ind;
 
     C1 = create_tableList();
     while (len != -1)
@@ -573,13 +577,14 @@ gen_L1_and_C2(FILE *f, ht_node *C2)
     cur_table = L1;
     len = 0;
     cnt = 0;
+    ind = 0;
     while (L1 != NULL)
     {
         for (i = 0; i < TABLE_LIST_SIZE; i++)
         {
             if (L1->table[i] >= MIN_SUP)
             {
-                cur_table->table[cnt] = i;
+                cur_table->table[cnt] = ind;
                 len++;
                 cnt++;
                 if (cnt >= TABLE_LIST_SIZE)
@@ -588,6 +593,7 @@ gen_L1_and_C2(FILE *f, ht_node *C2)
                     cur_table = cur_table->next_table;
                 }
             }
+            ind++;
         }
         L1 = L1->next_table;
     }
