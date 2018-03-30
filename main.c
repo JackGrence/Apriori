@@ -94,6 +94,7 @@ int main (int argc, char *argv[])
             printf ("++++++++++++++++++\n");
         }
 
+        printf("%d ", candidate_size);
         calc_time ("Start apriori generation");
 
         candidate = create_ht_node (0, 0);
@@ -422,7 +423,7 @@ L_combination (ht_node *large_item_set, ht_node *region_node, int item_size, ht_
                         guess_C[item_size - 1] = scan_ary[cmp_size];
                         guess_C[item_size] = cmp_ary[cmp_size];
                     }
-                    if (guess_C_isCorrect (guess_C, item_size + 1, large_item_set, item_size, prefix_ary))
+                    //if (guess_C_isCorrect (guess_C, item_size + 1, large_item_set, item_size, prefix_ary))
                         ht_insert (guess_C, item_size + 1, result_node, false);
                 }
                 if (scan_ind == scan_node->len - 1 && scan_node->next_leaf != NULL)
@@ -611,5 +612,7 @@ calc_time (const char *msg)
 {
     end = clock();
     spent = (double) (end - begin) / CLOCKS_PER_SEC;
+    printf ("-------------\n");
     printf ("%s\nUntil now, spent: %fs\n", msg, spent);
+    printf ("-------------\n");
 }
