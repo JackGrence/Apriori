@@ -23,9 +23,14 @@ void L_combination (ht_node *large_item_set, ht_node *region_node, int item_size
 void gen_largeitemset (ht_node *node, ht_node *result_node);
 void test();
 void count_C (ht_node *C, int C_itemSize);
+void calc_time (const char *msg);
 
 static char *FILE_NAME;
 static int MIN_SUP;
+static int item_num;
+static clock_t begin;
+static clock_t end;
+static double spent;
 
 int main (int argc, char *argv[])
 {
@@ -35,12 +40,8 @@ int main (int argc, char *argv[])
     //char *a[1];
     //gets(a);
 
-    int item_num;
-    clock_t begin = clock();
-    clock_t end;
-    clock_t last;
-    double spent;
     FILE *f;
+    begin = clock();
     int candidate_size;
     ht_node *large_item_set;
     ht_node *candidate;
@@ -65,25 +66,20 @@ int main (int argc, char *argv[])
 
     /* start count C2 */
     count_C (candidate, candidate_size);
-    end = clock();
-    spent = (double) (end - begin) / CLOCKS_PER_SEC;
-    printf ("Count C2 time: %fs\n", spent);
 
     //for (candidate_size = NUM_OF_INIT_CANDIDATE + 1; !ht_is_empty (candidate) && (candidate_size <= 3); candidate_size++)
     for (candidate_size = candidate_size + 1; !ht_is_empty (candidate); candidate_size++)
     {
-        if (candidate_size > 0)
-        {
-            printf ("==================\n");
-            print_ht_tree (candidate);
-            printf ("==================\n");
-            printf ("%d\n", candidate_size);
-        }
+        //if (candidate_size > 0)
+        //{
+        //    printf ("==================\n");
+        //    print_ht_tree (candidate);
+        //    printf ("==================\n");
+        //    printf ("%d\n", candidate_size);
+        //}
 
 
-        end = clock();
-        spent = (double) (end - begin) / CLOCKS_PER_SEC;
-        printf ("Start generate L, now: %fs\n", spent);
+        calc_time ("Start generate L");
 
         large_item_set = create_ht_node (0, 0);
         gen_largeitemset (candidate, large_item_set);
@@ -98,27 +94,19 @@ int main (int argc, char *argv[])
             printf ("++++++++++++++++++\n");
         }
 
-        end = clock();
-        spent = (double) (end - begin) / CLOCKS_PER_SEC;
-        printf ("Start apriori generation, now: %fs\n", spent);
+        calc_time ("Start apriori generation");
 
         candidate = create_ht_node (0, 0);
         apriori_gen (large_item_set, large_item_set, candidate_size - 1, candidate);
 
-        end = clock();
-        spent = (double) (end - begin) / CLOCKS_PER_SEC;
-        printf ("Start count_C, now: %fs\n", spent);
+        calc_time ("Start count_C");
 
         count_C (candidate, candidate_size);
 
-        end = clock();
-        spent = (double) (end - begin) / CLOCKS_PER_SEC;
-        printf ("End loop cycle, now: %fs\n", spent);
+        calc_time ("End loop cycle");
     }
 
-    end = clock();
-    spent = (double) (end - begin) / CLOCKS_PER_SEC;
-    printf ("Spent time: %fs\n", spent);
+    calc_time ("Total spent time");
     printf ("frq: %d\n", item_num);
     return 0;
 }
@@ -162,7 +150,6 @@ c_init (FILE *f)
     int *t_ary;
     root = create_ht_node (0, 0);
     int data[NUM_OF_INIT_CANDIDATE];
-    int i;
     while (len != -1)
     {
         len = get_transactions (f, &t_ary);
@@ -474,41 +461,6 @@ apriori_gen (ht_node *L_copy, ht_node *large_item_set, int item_size, ht_node *r
     {
         L_combination (L_copy, large_item_set, item_size, result_node);
     }
-
-    //item_list *large_item_list;
-    //large_item_list = (item_list *) malloc (sizeof (item_list));
-    //memset (large_item_list, 0, sizeof (item_list));
-    //gen_ht_item_list (large_item_set, large_item_list);
-
-    //item_list *list_i, *list_j;
-    //int cmp_size;
-    //int *candidate;
-    //cmp_size = large_item_list->next_item_list->item->size - 1;
-    //candidate = (int *) malloc (sizeof (int) * (cmp_size + 2));
-    //for (list_i = large_item_list->next_item_list; list_i != NULL;
-    //     list_i = list_i->next_item_list)
-    //{
-    //    for (list_j = large_item_list->next_item_list; list_j != NULL;
-    //         list_j = list_j->next_item_list)
-    //    {
-    //        if (!memcmp (list_i->item->items, list_j->item->items, cmp_size * sizeof (int)))
-    //        { /* match */
-    //            if (list_i->item->items[cmp_size] < list_j->item->items[cmp_size])
-    //            { /* judge large list */
-    //                memcpy (candidate, list_i->item->items, sizeof (int) * cmp_size);
-    //                candidate[cmp_size] = list_i->item->items[cmp_size];
-    //                candidate[cmp_size + 1] = list_j->item->items[cmp_size];
-
-    //                if (subset_belong_L (candidate, cmp_size + 2, large_item_list))
-    //                {
-    //                    ht_insert(candidate, cmp_size + 2, result_node, false);
-    //                }
-    //            }
-    //        }
-    //    }
-    //}
-
-    //free_item_list (large_item_list);
 }
 
 
@@ -557,10 +509,11 @@ gen_L1_and_C2(FILE *f, ht_node *C2)
     table_list *L1;
     table_list *cur_table;
     int L_ind;
-    int reach_max;
     int C_item[2];
     int ind;
+    int c2_num;
 
+    /* generate C1 */
     C1 = create_tableList();
     while (len != -1)
     {
@@ -573,6 +526,7 @@ gen_L1_and_C2(FILE *f, ht_node *C2)
             free (t_ary);
     }
 
+    /* generate L1 */
     L1 = C1;
     cur_table = L1;
     len = 0;
@@ -597,23 +551,22 @@ gen_L1_and_C2(FILE *f, ht_node *C2)
         }
         L1 = L1->next_table;
     }
+    calc_time ("end generate L1");
+
+    /* generate C2 */
+    c2_num = 0;
     L1 = C1;
-    reach_max = 0;
     for (L_ind = 0; L_ind < len - 1; L_ind++)
     {
-        C_item[0] = L1->table[L_ind % TABLE_LIST_SIZE];
-        reach_max++;
-        if (reach_max >= TABLE_LIST_SIZE)
-        {
-            L1 = L1->next_table;
-            reach_max = 0;
-        }
+        C_item[0] = get_tableL_val (L_ind, L1);
         for (i = L_ind + 1; i < len; i++)
         {
-            C_item[1] = L1->table[i % TABLE_LIST_SIZE];
+            C_item[1] = get_tableL_val (i, L1);
             ht_insert (C_item, 2, C2, false);
+            c2_num++;
         }
     }
+    printf ("C2 num: %d\n", c2_num);
     return len;
 }
 
@@ -644,4 +597,12 @@ count_C (ht_node *C, int C_itemSize)
     }
     fclose (f);
     free (prefix_ary);
+}
+
+void
+calc_time (const char *msg)
+{
+    end = clock();
+    spent = (double) (end - begin) / CLOCKS_PER_SEC;
+    printf ("%s\nUntil now, spent: %fs\n", msg, spent);
 }
