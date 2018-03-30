@@ -64,6 +64,7 @@ int main (int argc, char *argv[])
 
     fclose (f);
 
+    calc_time ("Start count C2");
     /* start count C2 */
     count_C (candidate, candidate_size);
 
@@ -169,33 +170,41 @@ c_init (FILE *f)
     return root;
 }
 
-
-
-
-
-
-
-
-
-
-
 void
 test ()
 {
-    FILE *f;
-    ht_node *root;
-    root = create_ht_node (0, 0);
-    f = fopen (FILE_NAME, "rb");
-    if (f == NULL)
-    {
-        printf ("Open file error.\nexit...\n%s\n", strerror (errno));
-        exit(1);
-    }
-    gen_L1_and_C2 (f, root);
-    fclose (f);
+    //FILE *f;
+    //ht_node *root;
+    //root = create_ht_node (0, 0);
+    //f = fopen (FILE_NAME, "rb");
+    //if (f == NULL)
+    //{
+    //    printf ("Open file error.\nexit...\n%s\n", strerror (errno));
+    //    exit(1);
+    //}
+    //gen_L1_and_C2 (f, root);
+    //fclose (f);
     //printf ("Test ht_insert\n");
-    //int ary[] = {0, 101, 103};
-    //int ary2[] = {0, 1, 2, 25, 40, 55, 95, 101, 103, 128};
+    int ary[] = {0, 101, 103};
+    ht_node *leaf;
+    item_set *item;
+    item = create_item_set (ary, 3);
+    leaf = create_leaf_node (item, 3);
+    int i;
+    for (i = 0; i < 10; i++)
+    {
+        ary[2] += 5;
+        item = create_item_set (ary, 3);
+        append_item_set (item, leaf);
+    }
+    ary[1] += 5;
+    for (i = 0; i < 10; i++)
+    {
+        ary[2] += 5;
+        item = create_item_set (ary, 3);
+        append_item_set (item, leaf);
+    }
+    print_ht_tree (leaf);
     //int prefix[3];
     //int i;
     //ht_node *root;
@@ -426,6 +435,8 @@ L_combination (ht_node *large_item_set, ht_node *region_node, int item_size, ht_
                     //if (guess_C_isCorrect (guess_C, item_size + 1, large_item_set, item_size, prefix_ary))
                         ht_insert (guess_C, item_size + 1, result_node, false);
                 }
+                else if (region_node->depth == item_size)
+                    scan_ind = scan_node->len - 1;
                 if (scan_ind == scan_node->len - 1 && scan_node->next_leaf != NULL)
                 {
                     scan_ind = -1;
@@ -612,7 +623,5 @@ calc_time (const char *msg)
 {
     end = clock();
     spent = (double) (end - begin) / CLOCKS_PER_SEC;
-    printf ("-------------\n");
-    printf ("%s\nUntil now, spent: %fs\n", msg, spent);
-    printf ("-------------\n");
+    printf ("%s, spent: %fs\n", msg, spent);
 }
