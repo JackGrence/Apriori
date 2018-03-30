@@ -1,4 +1,4 @@
-/* version: 1.1 */
+/* version: 1.2 */
 
 #include <stdio.h>
 #include <stdlib.h>
