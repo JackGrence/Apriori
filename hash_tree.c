@@ -273,7 +273,10 @@ ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
             if (!memcmp(item_set_ary[i]->items, prefix_ary, sizeof (int) * prefix_size))
             {
                 if (item_size == prefix_size) /* prefix size == item_size */
+                {
                     item_set_ary[i]->count++;
+                    break;
+                }
                 else
                 {
                     for (item_index = prefix_size; item_index < item_size; item_index++)
