@@ -1,4 +1,4 @@
-/* version: 1.3 */
+/* version: 1.4 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,14 +23,10 @@ void L_combination (ht_node *large_item_set, ht_node *region_node, int item_size
 void gen_largeitemset (ht_node *node, ht_node *result_node);
 void test();
 void count_C (ht_node *C, int C_itemSize);
-void calc_time (const char *msg);
 
 static char *FILE_NAME;
 static int MIN_SUP;
 static int item_num;
-static clock_t begin;
-static clock_t end;
-static double spent;
 
 int main (int argc, char *argv[])
 {
@@ -354,7 +350,7 @@ guess_C_isCorrect (int *ary, int ary_size, ht_node *node, int item_size, int *pr
 
 void
 L_combination (ht_node *large_item_set, ht_node *region_node, int item_size, ht_node *result_node)
-{
+{ /* C will not insert to tree with sorted order */
     int cmp_size;
     int item_set_ind;
     int scan_ind;
@@ -379,6 +375,7 @@ L_combination (ht_node *large_item_set, ht_node *region_node, int item_size, ht_
         nodes_ary = (ht_node **) region_node->nodes;
         concated_leafNode = NULL;
         last_node = NULL;
+
         for (node_ind = 0; node_ind < HASH_FUNC_MOD; node_ind++)
         {
             leaf_node = nodes_ary[node_ind];
@@ -570,8 +567,8 @@ gen_L1_and_C2(FILE *f, ht_node *C2)
         }
         L1 = L1->next_table;
     }
-    calc_time ("end generate L1");
 
+    calc_time ("Start generate C2");
     /* generate C2 */
     c2_num = 0;
     L1 = C1;
@@ -616,12 +613,4 @@ count_C (ht_node *C, int C_itemSize)
     }
     fclose (f);
     free (prefix_ary);
-}
-
-void
-calc_time (const char *msg)
-{
-    end = clock();
-    spent = (double) (end - begin) / CLOCKS_PER_SEC;
-    printf ("%s, spent: %fs\n", msg, spent);
 }

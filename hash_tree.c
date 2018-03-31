@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "hash_tree.h"
 #include "linklist.h"
+#include "display.h"
 
 void
 ht_insert (int *insert_item, int item_size, ht_node *node, bool needcount)
@@ -116,7 +117,7 @@ append_item_set (item_set *new_items, ht_node *leaf)
         return;
     }
 
-    if (leaf->depth == new_items->size)
+    if (leaf->depth + 1 == new_items->size)
     {
         add_deepest_leaf (new_items, leaf);
         return;
@@ -134,7 +135,10 @@ append_item_set (item_set *new_items, ht_node *leaf)
             hash_index = enum_item->items[leaf->depth] % HASH_FUNC_MOD;
             if (new_nodes[hash_index] != NULL)
             {
-                append_item_set (enum_item, new_nodes[hash_index]);
+                if (leaf->depth + 2 == new_items->size)
+                    add_deepest_leaf (enum_item, new_nodes[hash_index]);
+                else
+                    append_item_set (enum_item, new_nodes[hash_index]);
             }
             else
             {
@@ -146,7 +150,10 @@ append_item_set (item_set *new_items, ht_node *leaf)
 
         hash_index = new_items->items[leaf->depth] % HASH_FUNC_MOD;
         if (new_nodes[hash_index] != NULL)
-            append_item_set (new_items, new_nodes[hash_index]);
+            if (leaf->depth + 2 == new_items->size)
+                add_deepest_leaf (new_items, new_nodes[hash_index]);
+            else
+                append_item_set (new_items, new_nodes[hash_index]);
         else
             new_nodes[hash_index] =
                 create_leaf_node (new_items, leaf->depth + 1);
@@ -154,17 +161,6 @@ append_item_set (item_set *new_items, ht_node *leaf)
         free (leaf->nodes);
         leaf->nodes = (void **) new_nodes;
         leaf->len = 0;
-
-        if (leaf->depth + 1 == new_items->size)
-        { /* deepest leaf */
-            for (i = 0; i < MAX_LEAF_SIZE; i++)
-            {
-                if (new_nodes[i] != NULL)
-                {
-                    cate_deepest_leaf (new_nodes[i], new_items->size - 1);
-                }
-            }
-        }
     }
     else
     {
@@ -179,17 +175,21 @@ add_deepest_leaf (item_set *new_items, ht_node *leaf)
     int cmp_size;
     int *cmp_ary;
     int depth;
+    int match;
     item_set **item_set_ary;
     ht_node *prev_leaf;
 
     depth = leaf->depth;
     cmp_size = new_items->size - 1;
     cmp_ary = (int *) malloc (sizeof (int) * cmp_size);
+    prev_leaf = NULL;
     while (leaf != NULL)
     {
         item_set_ary = (item_set **) leaf->nodes;
         memcpy (cmp_ary, item_set_ary[0]->items, sizeof (int) * cmp_size);
-        if (!memcmp (cmp_ary, new_items->items, sizeof (int) * cmp_size))
+        match = memcmp (cmp_ary, new_items->items, sizeof (int) * cmp_size);
+        /* leaf's prefix ary vs new_items prefix ary */
+        if (match == 0)
         { /* match */
             if (leaf->len == MAX_LEAF_SIZE)
             {
@@ -203,6 +203,26 @@ add_deepest_leaf (item_set *new_items, ht_node *leaf)
                 return;
             }
         }
+        else if (match > 0)
+        { /* grater than */
+            if (prev_leaf != NULL)
+            {
+                prev_leaf->next_leaf = create_leaf_node (new_items, depth);
+                prev_leaf->next_leaf->next_leaf = leaf;
+            }
+            else
+            { /* copy leaf */
+                //prev_leaf = create_ht_node (0, 0);
+                //memcpy (prev_leaf, leaf, sizeof (ht_node));
+                prev_leaf = ht_node_cpy (leaf);
+                leaf->nodes[0] = new_items;
+                leaf->len = 1;
+                leaf->next_leaf = prev_leaf;
+                printf ("why?\n");
+                //exit (1);
+            }
+            return;
+        }
         else
         {
             prev_leaf = leaf;
@@ -210,6 +230,21 @@ add_deepest_leaf (item_set *new_items, ht_node *leaf)
         }
     }
     prev_leaf->next_leaf = create_leaf_node (new_items, depth);
+}
+
+ht_node *
+ht_node_cpy (ht_node *src)
+{
+    ht_node *new_node;
+    int i;
+
+    new_node = create_ht_node (src->depth, src->len);
+    new_node->next_leaf = src->next_leaf;
+    for (i = 0; i < HASH_FUNC_MOD; i++)
+    {
+        new_node->nodes[i] = src->nodes[i];
+    }
+    return new_node;
 }
 
 void
@@ -297,7 +332,7 @@ print_ht_tree (ht_node *node)
         {
             printf ("Find leaf node.\ncontent:\n");
             item_set_ary = (item_set **) current_node->nodes;
-            for (i = 0; i < MAX_LEAF_SIZE; i++)
+            for (i = 0; i < current_node->len; i++)
             {
                 if (item_set_ary[i] != NULL)
                 {
@@ -341,6 +376,7 @@ ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
     int item_index;
     int prefix_size;
     int tableL_val;
+    int match;
     item_set **item_set_ary;
 
     prefix_size = node->depth;
@@ -372,23 +408,32 @@ ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
             if (item_set_ary[i] == NULL)
                 continue;
 
-            if (item_size == prefix_size) /* at deepest leaf */
+            if (item_size - 1 == prefix_size) /* at deepest leaf */
             {
-                if (memcmp (item_set_ary[i]->items, prefix_ary, sizeof (int) * (prefix_size - 1)))
-                { /* no match */
+                match = memcmp (item_set_ary[i]->items, prefix_ary, sizeof (int) * (prefix_size));
+                //if (match != 0)
+                //    break;
+                if (match < 0)
+                { /* less than */
+                    //printf ("next_leaf\n");
                     break;
+                }
+                else if (match > 0)
+                {
+                    //printf ("YAY, return\n");
+                    return;
                 }
             }
 
             if (!memcmp (item_set_ary[i]->items, prefix_ary, sizeof (int) * prefix_size))
             {
-                if (item_size == prefix_size) /* prefix size == item_size */
-                {
-                    item_set_ary[i]->count++;
-                    break;
-                }
-                else
-                {
+                //if (item_size - 1 == prefix_size) /* prefix size == item_size */
+                //{
+                //    item_set_ary[i]->count++;
+                //    break;
+                //}
+                //else
+                //{
                     for (item_index = prefix_size; item_index < item_size; item_index++)
                     {
                         tableL_val = get_tableL_val (item_set_ary[i]->items[item_index], remain_aryTableL);
@@ -396,7 +441,7 @@ ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
                             break;
                     }
                     item_set_ary[i]->count += tableL_val;
-                }
+                //}
             }
         }
         free_tableList (remain_aryTableL);
@@ -435,10 +480,13 @@ ht_is_empty (ht_node *node)
 {
     //char null_str[HASH_FUNC_MOD * sizeof (int)];
     //memset (null_str, 0, HASH_FUNC_MOD * sizeof (int));
+    int match;
     void **null_str;
     null_str = (void **) malloc(sizeof (void *) * HASH_FUNC_MOD);
     memset (null_str, 0, sizeof (void *) * HASH_FUNC_MOD);
-    return !memcmp (null_str, node->nodes, HASH_FUNC_MOD * sizeof (void *));
+    match = !memcmp (null_str, node->nodes, HASH_FUNC_MOD * sizeof (void *));
+    free (null_str);
+    return match;
 }
 
 int

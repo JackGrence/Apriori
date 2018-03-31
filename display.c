@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include "hash_tree.h"
 #include "linklist.h"
 #include "display.h"
@@ -40,4 +41,12 @@ print_tableList (table_list *tableL)
         tableL = tableL->next_table;
         cnt++;
     }
+}
+
+void
+calc_time (const char *msg)
+{
+    end = clock();
+    spent = (double) (end - begin) / CLOCKS_PER_SEC;
+    printf ("%s, spent: %fs\n", msg, spent);
 }

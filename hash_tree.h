@@ -4,8 +4,8 @@
 #ifndef HASH_TREE
 #define HASH_TREE
 
-#define HASH_FUNC_MOD 500
-#define MAX_LEAF_SIZE 500
+#define HASH_FUNC_MOD 997
+#define MAX_LEAF_SIZE 51
 #define NUM_OF_INIT_CANDIDATE 1
 
 typedef struct hash_tree_node
@@ -46,5 +46,6 @@ int show_items_from_ht (ht_node *node);
 void free_leaf_node (ht_node *leaf);
 void cate_deepest_leaf (ht_node *leaf, int cmp_size);
 void add_deepest_leaf (item_set *new_items, ht_node *leaf);
+ht_node *ht_node_cpy (ht_node *src);
 
 #endif /* ifndef HASH_TREE */
