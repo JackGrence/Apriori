@@ -16,7 +16,7 @@
 bool subset_belong_L (int *ary, int ary_size, item_list *large_item_list);
 bool guess_C_isCorrect (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary);
 ht_node * c_init (FILE *f);
-int gen_L1_and_C2(FILE *f, ht_node *C2);
+int gen_L1_and_C2(FILE *f, ht_node **C2);
 int get_transactions (FILE *f, int **ary);
 void apriori_gen (ht_node *L_copy, ht_node *large_item_set, int item_size, ht_node *result_node);
 void L_combination (ht_node *large_item_set, ht_node *region_node, int item_size, ht_node *result_node);
@@ -53,8 +53,7 @@ int main (int argc, char *argv[])
         exit(1);
     }
 
-    candidate = create_ht_node (0, 0);
-    item_num = gen_L1_and_C2 (f, candidate);
+    item_num = gen_L1_and_C2 (f, &candidate);
     printf ("L1 size: %d\n", item_num);
     candidate_size = 2;
 
@@ -514,7 +513,7 @@ subset_belong_L (int *ary, int ary_size, item_list *large_item_list)
 }
 
 int
-gen_L1_and_C2(FILE *f, ht_node *C2)
+gen_L1_and_C2(FILE *f, ht_node **C2)
 {
     /* return L1 size */
     int *t_ary;
@@ -568,6 +567,12 @@ gen_L1_and_C2(FILE *f, ht_node *C2)
         L1 = L1->next_table;
     }
 
+    HASH_FUNC_MOD = ind;
+    MAX_LEAF_SIZE = HASH_FUNC_MOD / 10;
+    printf ("Find HASH_FUNC_MOD: %d\n", HASH_FUNC_MOD);
+    printf ("Find MAX_LEAF_SIZE: %d\n", MAX_LEAF_SIZE);
+    *C2 = create_ht_node (0, 0);
+
     calc_time ("Start generate C2");
     /* generate C2 */
     c2_num = 0;
@@ -578,7 +583,7 @@ gen_L1_and_C2(FILE *f, ht_node *C2)
         for (i = L_ind + 1; i < len; i++)
         {
             C_item[1] = get_tableL_val (i, L1);
-            ht_insert (C_item, 2, C2, false);
+            ht_insert (C_item, 2, *C2, false);
             c2_num++;
         }
     }
