@@ -23,14 +23,10 @@ void L_combination (ht_node *large_item_set, ht_node *region_node, int item_size
 void gen_largeitemset (ht_node *node, ht_node *result_node);
 void test();
 void count_C (ht_node *C, int C_itemSize);
-void calc_time (const char *msg);
 
 static char *FILE_NAME;
 static int MIN_SUP;
 static int item_num;
-static clock_t begin;
-static clock_t end;
-static double spent;
 
 int main (int argc, char *argv[])
 {
@@ -617,12 +613,4 @@ count_C (ht_node *C, int C_itemSize)
     }
     fclose (f);
     free (prefix_ary);
-}
-
-void
-calc_time (const char *msg)
-{
-    end = clock();
-    spent = (double) (end - begin) / CLOCKS_PER_SEC;
-    printf ("%s, spent: %fs\n", msg, spent);
 }

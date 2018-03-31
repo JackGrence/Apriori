@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "hash_tree.h"
 #include "linklist.h"
+#include "display.h"
 
 void
 ht_insert (int *insert_item, int item_size, ht_node *node, bool needcount)
@@ -116,7 +117,7 @@ append_item_set (item_set *new_items, ht_node *leaf)
         return;
     }
 
-    if (leaf->depth == new_items->size)
+    if (leaf->depth + 1 == new_items->size)
     {
         add_deepest_leaf (new_items, leaf);
         return;
@@ -134,7 +135,7 @@ append_item_set (item_set *new_items, ht_node *leaf)
             hash_index = enum_item->items[leaf->depth] % HASH_FUNC_MOD;
             if (new_nodes[hash_index] != NULL)
             {
-                if (leaf->depth + 1 == new_items->size)
+                if (leaf->depth + 2 == new_items->size)
                     add_deepest_leaf (enum_item, new_nodes[hash_index]);
                 else
                     append_item_set (enum_item, new_nodes[hash_index]);
@@ -149,7 +150,7 @@ append_item_set (item_set *new_items, ht_node *leaf)
 
         hash_index = new_items->items[leaf->depth] % HASH_FUNC_MOD;
         if (new_nodes[hash_index] != NULL)
-            if (leaf->depth + 1 == new_items->size)
+            if (leaf->depth + 2 == new_items->size)
                 add_deepest_leaf (new_items, new_nodes[hash_index]);
             else
                 append_item_set (new_items, new_nodes[hash_index]);
@@ -160,17 +161,6 @@ append_item_set (item_set *new_items, ht_node *leaf)
         free (leaf->nodes);
         leaf->nodes = (void **) new_nodes;
         leaf->len = 0;
-
-        //if (leaf->depth + 1 == new_items->size)
-        //{ /* deepest leaf */
-        //    for (i = 0; i < MAX_LEAF_SIZE; i++)
-        //    {
-        //        if (new_nodes[i] != NULL)
-        //        {
-        //            cate_deepest_leaf (new_nodes[i], new_items->size - 1);
-        //        }
-        //    }
-        //}
     }
     else
     {
@@ -228,6 +218,7 @@ add_deepest_leaf (item_set *new_items, ht_node *leaf)
                 leaf->nodes[0] = new_items;
                 leaf->len = 1;
                 leaf->next_leaf = prev_leaf;
+                printf ("why?\n");
                 //exit (1);
             }
             return;
@@ -417,9 +408,9 @@ ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
             if (item_set_ary[i] == NULL)
                 continue;
 
-            if (item_size == prefix_size) /* at deepest leaf */
+            if (item_size - 1 == prefix_size) /* at deepest leaf */
             {
-                match = memcmp (item_set_ary[i]->items, prefix_ary, sizeof (int) * (prefix_size - 1));
+                match = memcmp (item_set_ary[i]->items, prefix_ary, sizeof (int) * (prefix_size));
                 //if (match != 0)
                 //    break;
                 if (match < 0)
@@ -436,13 +427,13 @@ ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
 
             if (!memcmp (item_set_ary[i]->items, prefix_ary, sizeof (int) * prefix_size))
             {
-                if (item_size == prefix_size) /* prefix size == item_size */
-                {
-                    item_set_ary[i]->count++;
-                    break;
-                }
-                else
-                {
+                //if (item_size - 1 == prefix_size) /* prefix size == item_size */
+                //{
+                //    item_set_ary[i]->count++;
+                //    break;
+                //}
+                //else
+                //{
                     for (item_index = prefix_size; item_index < item_size; item_index++)
                     {
                         tableL_val = get_tableL_val (item_set_ary[i]->items[item_index], remain_aryTableL);
@@ -450,7 +441,7 @@ ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
                             break;
                     }
                     item_set_ary[i]->count += tableL_val;
-                }
+                //}
             }
         }
         free_tableList (remain_aryTableL);
