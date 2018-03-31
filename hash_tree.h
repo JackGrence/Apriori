@@ -46,5 +46,6 @@ int show_items_from_ht (ht_node *node);
 void free_leaf_node (ht_node *leaf);
 void cate_deepest_leaf (ht_node *leaf, int cmp_size);
 void add_deepest_leaf (item_set *new_items, ht_node *leaf);
+ht_node *ht_node_cpy (ht_node *src);
 
 #endif /* ifndef HASH_TREE */

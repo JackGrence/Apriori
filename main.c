@@ -354,7 +354,7 @@ guess_C_isCorrect (int *ary, int ary_size, ht_node *node, int item_size, int *pr
 
 void
 L_combination (ht_node *large_item_set, ht_node *region_node, int item_size, ht_node *result_node)
-{
+{ /* C will not insert to tree with sorted order */
     int cmp_size;
     int item_set_ind;
     int scan_ind;
@@ -379,6 +379,7 @@ L_combination (ht_node *large_item_set, ht_node *region_node, int item_size, ht_
         nodes_ary = (ht_node **) region_node->nodes;
         concated_leafNode = NULL;
         last_node = NULL;
+
         for (node_ind = 0; node_ind < HASH_FUNC_MOD; node_ind++)
         {
             leaf_node = nodes_ary[node_ind];
@@ -570,8 +571,8 @@ gen_L1_and_C2(FILE *f, ht_node *C2)
         }
         L1 = L1->next_table;
     }
-    calc_time ("end generate L1");
 
+    calc_time ("Start generate C2");
     /* generate C2 */
     c2_num = 0;
     L1 = C1;
