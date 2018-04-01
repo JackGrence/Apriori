@@ -1,11 +1,10 @@
-/* version: 1.4 */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include <errno.h>
 #include <time.h>
+#include "version.h"
 #include "hash_tree.h"
 #include "linklist.h"
 #include "display.h"
