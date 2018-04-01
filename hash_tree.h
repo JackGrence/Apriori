@@ -4,9 +4,10 @@
 #ifndef HASH_TREE
 #define HASH_TREE
 
-#define HASH_FUNC_MOD 997
-#define MAX_LEAF_SIZE 51
 #define NUM_OF_INIT_CANDIDATE 1
+
+int HASH_FUNC_MOD;
+int MAX_LEAF_SIZE;
 
 typedef struct hash_tree_node
 {

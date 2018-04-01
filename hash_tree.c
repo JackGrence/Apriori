@@ -408,9 +408,9 @@ ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
             if (item_set_ary[i] == NULL)
                 continue;
 
+            match = memcmp (item_set_ary[i]->items, prefix_ary, sizeof (int) * (prefix_size));
             if (item_size - 1 == prefix_size) /* at deepest leaf */
             {
-                match = memcmp (item_set_ary[i]->items, prefix_ary, sizeof (int) * (prefix_size));
                 //if (match != 0)
                 //    break;
                 if (match < 0)
@@ -425,7 +425,7 @@ ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
                 }
             }
 
-            if (!memcmp (item_set_ary[i]->items, prefix_ary, sizeof (int) * prefix_size))
+            if (match == 0)
             {
                 //if (item_size - 1 == prefix_size) /* prefix size == item_size */
                 //{
