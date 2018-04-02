@@ -11,59 +11,25 @@ ht_insert (int *insert_item, int item_size, ht_node *node, bool needcount)
 {
     int hash_index;
     ht_node *childnode;
-    int i;
-    int match;
     item_set *new_items;
-    if (node->len == 0) /* is interior node */
+
+    hash_index = insert_item[node->depth] % HASH_FUNC_MOD;
+    childnode = (ht_node *) node->nodes[hash_index];
+    if (node->depth != item_size - 1) /* is interior node */
     {
-        hash_index = insert_item[node->depth] % HASH_FUNC_MOD;
-        childnode = (ht_node *) node->nodes[hash_index];
         if (childnode == NULL)
         {
-            /* create leaf node */
-            new_items = create_item_set (insert_item, item_size);
-            new_items->count = needcount ? 1 : 0;
-            node->nodes[hash_index] =
-                create_leaf_node (new_items, node->depth + 1);
+            /* create interior node until leaf */
+            node->nodes[hash_index] = create_ht_node (node->depth + 1, 0);
+            childnode = (ht_node *) node->nodes[hash_index];
         }
-        else
-        {
-            ht_insert (insert_item, item_size, childnode, needcount);
-        }
+        ht_insert (insert_item, item_size, childnode, needcount);
     }
-    else  /* is leaf node */
+    else  /* create leaf */
     {
-        /* search item */
-        childnode = node;
-        while (childnode != NULL)
-        {
-            for (i = 0; i < MAX_LEAF_SIZE; i++)
-            {
-                if (childnode->nodes[i] != NULL)
-                    match = memcmp (insert_item,
-                                    ((item_set *)childnode->nodes[i])->items,
-                                    sizeof (int) * item_size);
-
-                if (match == 0)
-                    break;
-            }
-
-            if (match == 0)
-            {
-                /* count++ */
-                if (needcount)
-                    ((item_set *) childnode->nodes[i])->count++;
-                break;
-            }
-            else if (childnode->next_leaf == NULL)
-            {
-                new_items = create_item_set (insert_item, item_size);
-                new_items->count = needcount ? 1 : 0;
-                append_item_set (new_items, childnode);
-                break;
-            }
-            childnode = childnode->next_leaf;
-        }
+        new_items = create_item_set (insert_item, item_size);
+        node->nodes[hash_index] = new_items;
+        node->len++;
     }
 }
 
@@ -75,7 +41,7 @@ create_ht_node (int depth, int len)
     memset (new_node, 0, sizeof (ht_node));
     new_node->depth = depth;
     new_node->len = len;
-    new_node->nodes = (void **) malloc(sizeof (void *) * HASH_FUNC_MOD);
+    new_node->nodes = (void **) malloc (sizeof (void *) * HASH_FUNC_MOD);
     memset (new_node->nodes, 0, sizeof (void *) * HASH_FUNC_MOD);
     return new_node;
 }
@@ -97,7 +63,11 @@ ht_node *
 create_leaf_node (item_set *items, int depth)
 {
     ht_node *new_leaf_node;
-    new_leaf_node = create_ht_node (depth, 1);
+    new_leaf_node = (ht_node *) malloc (sizeof (ht_node));
+    memset (new_leaf_node, 0, sizeof (ht_node));
+    new_leaf_node->depth = depth;
+    new_leaf_node->len = 1;
+    new_leaf_node->nodes = (void **) malloc (sizeof (void *));
     new_leaf_node->nodes[0] = items;
     return new_leaf_node;
 }
@@ -117,7 +87,7 @@ append_item_set (item_set *new_items, ht_node *leaf)
         return;
     }
 
-    if (leaf->depth + 1 == new_items->size)
+    if (leaf->depth == new_items->size)
     {
         add_deepest_leaf (new_items, leaf);
         return;
@@ -135,7 +105,7 @@ append_item_set (item_set *new_items, ht_node *leaf)
             hash_index = enum_item->items[leaf->depth] % HASH_FUNC_MOD;
             if (new_nodes[hash_index] != NULL)
             {
-                if (leaf->depth + 2 == new_items->size)
+                if (leaf->depth + 1 == new_items->size)
                     add_deepest_leaf (enum_item, new_nodes[hash_index]);
                 else
                     append_item_set (enum_item, new_nodes[hash_index]);
@@ -150,7 +120,7 @@ append_item_set (item_set *new_items, ht_node *leaf)
 
         hash_index = new_items->items[leaf->depth] % HASH_FUNC_MOD;
         if (new_nodes[hash_index] != NULL)
-            if (leaf->depth + 2 == new_items->size)
+            if (leaf->depth + 1 == new_items->size)
                 add_deepest_leaf (new_items, new_nodes[hash_index]);
             else
                 append_item_set (new_items, new_nodes[hash_index]);
@@ -382,7 +352,7 @@ ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
     prefix_size = node->depth;
     table_list *remain_aryTableL;
 
-    if (node->len == 0) /* is interior node */
+    if (node->depth != item_size - 1) /* is interior node */
     {
         for (i = 0; i <= ary_size - item_size + prefix_size; i++)
         {
@@ -395,59 +365,15 @@ ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
             }
         }
     }
-    else  /* is leaf node */
+    else
     {
-        /* search item */
-        remain_aryTableL = create_tableList();
-        for (i = 0; i < ary_size; i++)
-            tableL_insert (ary[i], remain_aryTableL, true);
-
         item_set_ary = (item_set **) node->nodes;
-        for (i = 0; i < node->len; i++)
+        for (i = 0; i < ary_size; i++)
         {
-            if (item_set_ary[i] == NULL)
-                continue;
-
-            match = memcmp (item_set_ary[i]->items, prefix_ary, sizeof (int) * (prefix_size));
-            if (item_size - 1 == prefix_size) /* at deepest leaf */
-            {
-                //if (match != 0)
-                //    break;
-                if (match < 0)
-                { /* less than */
-                    //printf ("next_leaf\n");
-                    break;
-                }
-                else if (match > 0)
-                {
-                    //printf ("YAY, return\n");
-                    return;
-                }
-            }
-
-            if (match == 0)
-            {
-                //if (item_size - 1 == prefix_size) /* prefix size == item_size */
-                //{
-                //    item_set_ary[i]->count++;
-                //    break;
-                //}
-                //else
-                //{
-                    for (item_index = prefix_size; item_index < item_size; item_index++)
-                    {
-                        tableL_val = get_tableL_val (item_set_ary[i]->items[item_index], remain_aryTableL);
-                        if (tableL_val == 0)
-                            break;
-                    }
-                    item_set_ary[i]->count += tableL_val;
-                //}
-            }
+            hash_index = ary[i] % HASH_FUNC_MOD;
+            if (item_set_ary[hash_index] != NULL)
+                item_set_ary[hash_index]->count++;
         }
-        free_tableList (remain_aryTableL);
-        if (node->next_leaf != NULL)
-            ht_count (ary, ary_size, node->next_leaf, item_size, prefix_ary);
-
     }
 }
 
@@ -510,7 +436,7 @@ show_items_from_ht (ht_node *node)
     else
     {
         item_set_ary = (item_set **) node->nodes;
-        for (i = 0; i < MAX_LEAF_SIZE; i++)
+        for (i = 0; i < HASH_FUNC_MOD; i++)
         {
             if (item_set_ary[i] != NULL)
             {

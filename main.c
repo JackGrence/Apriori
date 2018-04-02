@@ -19,7 +19,7 @@ int gen_L1_and_C2(FILE *f, ht_node **C2);
 int get_transactions (FILE *f, int **ary);
 void apriori_gen (ht_node *L_copy, ht_node *large_item_set, int item_size, ht_node *result_node);
 void L_combination (ht_node *large_item_set, ht_node *region_node, int item_size, ht_node *result_node);
-void gen_largeitemset (ht_node *node, ht_node *result_node);
+void gen_largeitemset (ht_node *node, int item_size, ht_node *result_node);
 void test();
 void count_C (ht_node *C, int C_itemSize);
 
@@ -77,7 +77,7 @@ int main (int argc, char *argv[])
         calc_time ("Start generate L");
 
         large_item_set = create_ht_node (0, 0);
-        gen_largeitemset (candidate, large_item_set);
+        gen_largeitemset (candidate, candidate_size - 1, large_item_set);
         free (candidate);
         if (ht_is_empty (large_item_set))
             break;
@@ -234,27 +234,27 @@ test ()
 
 
 void
-gen_largeitemset (ht_node *node, ht_node *result_node)
+gen_largeitemset (ht_node *node, int item_size, ht_node *result_node)
 {
     int i;
     ht_node **nodes_ary;
     item_set **item_set_ary;
-    if (node->len == 0) /* is interior node */
+    if (node->depth != item_size - 1) /* is interior node */
     {
         nodes_ary = (ht_node **) node->nodes;
         for (i = 0; i < HASH_FUNC_MOD; i++)
         {
             if (nodes_ary[i] != NULL)
             {
-                gen_largeitemset (nodes_ary[i], result_node);
+                gen_largeitemset (nodes_ary[i], item_size, result_node);
                 free (nodes_ary[i]);
             }
         }
     }
-    else /* leaf node */
+    else
     {
         item_set_ary = (item_set **) node->nodes;
-        for (i = 0; i < node->len; i++)
+        for (i = 0; i < HASH_FUNC_MOD; i++)
         {
             if (item_set_ary[i] != NULL)
             {
@@ -266,7 +266,8 @@ gen_largeitemset (ht_node *node, ht_node *result_node)
         }
         if (node->next_leaf != NULL)
         {
-            gen_largeitemset (node->next_leaf, result_node);
+            printf ("impossible\n");
+            gen_largeitemset (node->next_leaf, item_size, result_node);
             free (node->next_leaf);
         }
     }
@@ -350,97 +351,35 @@ void
 L_combination (ht_node *large_item_set, ht_node *region_node, int item_size, ht_node *result_node)
 { /* C will not insert to tree with sorted order */
     int cmp_size;
-    int item_set_ind;
     int scan_ind;
     int node_ind;
     int *guess_C;
-    int *cmp_ary;
-    int *scan_ary;
     int *prefix_ary;
     ht_node **nodes_ary;
-    ht_node *leaf_node;
-    ht_node *concated_leafNode;
-    ht_node *last_node;
-    ht_node *scan_node;
-    ht_node *free_node;
     item_set **item_set_ary;
     guess_C = (int *) malloc (sizeof (int) * (item_size + 1));
     prefix_ary = (int *) malloc (sizeof (int) * item_size);
 
     cmp_size = item_size - 1;
-    if (region_node->len == 0) /* interior node */
+
+    item_set_ary = (item_set **) region_node->nodes;
+    for (node_ind = 0; node_ind < HASH_FUNC_MOD; node_ind++)
     {
-        nodes_ary = (ht_node **) region_node->nodes;
-        concated_leafNode = NULL;
-        last_node = NULL;
-
-        for (node_ind = 0; node_ind < HASH_FUNC_MOD; node_ind++)
+        if (item_set_ary[node_ind] != NULL)
         {
-            leaf_node = nodes_ary[node_ind];
-            if (leaf_node != NULL)
+            memcpy (guess_C, item_set_ary[node_ind]->items, sizeof (int) * item_size);
+            for (scan_ind = node_ind + 1; scan_ind < HASH_FUNC_MOD; scan_ind++)
             {
-                if (concated_leafNode == NULL)
-                    concated_leafNode = leaf_node; /* get first leaf node */
-
-                if (last_node != NULL)
+                if (item_set_ary[scan_ind] != NULL)
                 {
-                    last_node->next_leaf = leaf_node;
+                    guess_C[item_size] = scan_ind;
+                    ht_insert (guess_C, item_size + 1, result_node, false);
                 }
-
-                while (leaf_node->next_leaf != NULL)
-                    leaf_node = leaf_node->next_leaf;
-
-                last_node = leaf_node;
             }
+            free (item_set_ary[node_ind]);
         }
-        L_combination (large_item_set, concated_leafNode, item_size, result_node);
-        free (concated_leafNode);
-        free (nodes_ary);
     }
-    else
-    {
-        free_node = region_node;
-        item_set_ary = (item_set **) region_node->nodes;
-        for (item_set_ind = 0; item_set_ind < region_node->len; item_set_ind++) /* scan item_set_ary */
-        {
-            cmp_ary = item_set_ary[item_set_ind]->items;
-            if (item_set_ind == region_node->len - 1 && region_node->next_leaf != NULL)
-            { /* reach last item of leaf node && have next leaf node*/
-                item_set_ind = -1;
-                region_node = region_node->next_leaf;
-                item_set_ary = (item_set **) region_node->nodes;
-            }
-			scan_node = region_node;
-            for (scan_ind = item_set_ind + 1; scan_ind < scan_node->len; scan_ind++)
-            {
-                scan_ary = ((item_set *) scan_node->nodes[scan_ind])->items;
-                if (!memcmp (cmp_ary, scan_ary, sizeof (int) * cmp_size))
-                {
-                    memcpy (guess_C, cmp_ary, sizeof (int) * cmp_size);
-                    if (cmp_ary[cmp_size] < scan_ary[cmp_size])
-                    {
-                        guess_C[item_size - 1] = cmp_ary[cmp_size];
-                        guess_C[item_size] = scan_ary[cmp_size];
-                    }
-                    else
-                    {
-                        guess_C[item_size - 1] = scan_ary[cmp_size];
-                        guess_C[item_size] = cmp_ary[cmp_size];
-                    }
-                    //if (guess_C_isCorrect (guess_C, item_size + 1, large_item_set, item_size, prefix_ary))
-                        ht_insert (guess_C, item_size + 1, result_node, false);
-                }
-                else if (region_node->depth == item_size)
-                    scan_ind = scan_node->len - 1;
-                if (scan_ind == scan_node->len - 1 && scan_node->next_leaf != NULL)
-                {
-                    scan_ind = -1;
-                    scan_node = scan_node->next_leaf;
-                }
-            }
-        }
-        free_leaf_node (free_node);
-    }
+    free (item_set_ary);
     free (prefix_ary);
     free (guess_C);
 }
@@ -451,29 +390,22 @@ apriori_gen (ht_node *L_copy, ht_node *large_item_set, int item_size, ht_node *r
 {
     int node_ind;
     ht_node **nodes_ary;
-    if (large_item_set->len == 0) /* interior node */
+    if (large_item_set->depth == item_size - 1)
     {
-        if (large_item_set->depth == item_size - 1)
-        {
-            L_combination (L_copy, large_item_set, item_size, result_node);
-        }
-        else
-        {
-            nodes_ary = (ht_node **) large_item_set->nodes;
-            for (node_ind = 0; node_ind < HASH_FUNC_MOD; node_ind++)
-            {
-                if (nodes_ary[node_ind] != NULL)
-                {
-                    apriori_gen (L_copy, nodes_ary[node_ind], item_size, result_node);
-                    free (nodes_ary[node_ind]);
-                }
-            }
-            free (nodes_ary);
-        }
+        L_combination (L_copy, large_item_set, item_size, result_node);
     }
     else
     {
-        L_combination (L_copy, large_item_set, item_size, result_node);
+        nodes_ary = (ht_node **) large_item_set->nodes;
+        for (node_ind = 0; node_ind < HASH_FUNC_MOD; node_ind++)
+        {
+            if (nodes_ary[node_ind] != NULL)
+            {
+                apriori_gen (L_copy, nodes_ary[node_ind], item_size, result_node);
+                free (nodes_ary[node_ind]);
+            }
+        }
+        free (nodes_ary);
     }
 }
 
@@ -567,7 +499,7 @@ gen_L1_and_C2(FILE *f, ht_node **C2)
     }
 
     HASH_FUNC_MOD = ind;
-    MAX_LEAF_SIZE = HASH_FUNC_MOD / 10;
+    MAX_LEAF_SIZE = 1;
     printf ("Find HASH_FUNC_MOD: %d\n", HASH_FUNC_MOD);
     printf ("Find MAX_LEAF_SIZE: %d\n", MAX_LEAF_SIZE);
     *C2 = create_ht_node (0, 0);
