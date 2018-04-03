@@ -10,26 +10,29 @@ void
 ht_insert (int *insert_item, int item_size, ht_node *node, bool needcount)
 {
     int hash_index;
+    int next_node_len;
+    int node_offset;
     ht_node *childnode;
     item_set *new_items;
 
-    hash_index = insert_item[node->depth] % HASH_FUNC_MOD;
-    childnode = (ht_node *) node->nodes[hash_index];
+    hash_index = insert_item[node->depth];
+    node_offset = NODE_INDEX (node->len, hash_index);
+    childnode = (ht_node *) node->nodes[node_offset];
     if (node->depth != item_size - 1) /* is interior node */
     {
         if (childnode == NULL)
         {
             /* create interior node until leaf */
-            node->nodes[hash_index] = create_ht_node (node->depth + 1, 0);
-            childnode = (ht_node *) node->nodes[hash_index];
+            next_node_len = NODE_LEN (hash_index);
+            node->nodes[node_offset] = create_ht_node (node->depth + 1, next_node_len);
+            childnode = (ht_node *) node->nodes[node_offset];
         }
         ht_insert (insert_item, item_size, childnode, needcount);
     }
     else  /* create leaf */
     {
         new_items = create_item_set (insert_item, item_size);
-        node->nodes[hash_index] = new_items;
-        node->len++;
+        node->nodes[node_offset] = new_items;
     }
 }
 
@@ -37,12 +40,10 @@ ht_node *
 create_ht_node (int depth, int len)
 {
     ht_node *new_node;
-    new_node = (ht_node *) malloc (sizeof (ht_node));
-    memset (new_node, 0, sizeof (ht_node));
+    new_node = (ht_node *) calloc (1, sizeof (ht_node));
     new_node->depth = depth;
     new_node->len = len;
-    new_node->nodes = (void **) malloc (sizeof (void *) * HASH_FUNC_MOD);
-    memset (new_node->nodes, 0, sizeof (void *) * HASH_FUNC_MOD);
+    new_node->nodes = (void **) calloc (len, sizeof (void *));
     return new_node;
 }
 
@@ -102,7 +103,7 @@ append_item_set (item_set *new_items, ht_node *leaf)
         for (i = 0; i < MAX_LEAF_SIZE; i++)
         {
             enum_item = (item_set *) leaf->nodes[i];
-            hash_index = enum_item->items[leaf->depth] % HASH_FUNC_MOD;
+            hash_index = enum_item->items[leaf->depth];
             if (new_nodes[hash_index] != NULL)
             {
                 if (leaf->depth + 1 == new_items->size)
@@ -118,7 +119,7 @@ append_item_set (item_set *new_items, ht_node *leaf)
             }
         }
 
-        hash_index = new_items->items[leaf->depth] % HASH_FUNC_MOD;
+        hash_index = new_items->items[leaf->depth];
         if (new_nodes[hash_index] != NULL)
             if (leaf->depth + 1 == new_items->size)
                 add_deepest_leaf (new_items, new_nodes[hash_index]);
@@ -276,22 +277,22 @@ cate_deepest_leaf (ht_node *leaf, int cmp_size)
 }
 
 void
-print_ht_tree (ht_node *node)
+print_ht_tree (ht_node *node, int item_size)
 {
     int i;
     int cnt;
     ht_node **nodes_ary;
     item_set **item_set_ary;
     ht_node *current_node;
-    if (node->len == 0) /* is interior node */
+    if (node->depth != item_size - 1) /* is interior node */
     {
         nodes_ary = (ht_node **) node->nodes;
-        for (i = 0; i < HASH_FUNC_MOD; i++)
+        for (i = 0; i < node->len; i++)
         {
             if (nodes_ary[i] != NULL)
             {
                 printf ("Find interior node: %d, depth: %d\n", i, node->depth);
-                print_ht_tree (nodes_ary[i]);
+                print_ht_tree (nodes_ary[i], item_size);
             }
         }
     }
@@ -342,6 +343,7 @@ ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
 {
     ht_node *childnode;
     int hash_index;
+    int node_offset;
     int i;
     int item_index;
     int prefix_size;
@@ -352,13 +354,14 @@ ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
     prefix_size = node->depth;
     table_list *remain_aryTableL;
 
-    if (node->depth != item_size - 1) /* is interior node */
+    if (node->depth != item_size - 1)
     {
         for (i = 0; i <= ary_size - item_size + prefix_size; i++)
         {
             prefix_ary[prefix_size] = ary[i];
-            hash_index = ary[i] % HASH_FUNC_MOD;
-            childnode = (ht_node *) node->nodes[hash_index];
+            hash_index = ary[i];
+            node_offset = NODE_INDEX (node->len, hash_index);
+            childnode = (ht_node *) node->nodes[node_offset];
             if (childnode != NULL)
             {
                 ht_count (&ary[i + 1], ary_size - i - 1, childnode, item_size, prefix_ary);
@@ -370,9 +373,10 @@ ht_count (int *ary, int ary_size, ht_node *node, int item_size, int *prefix_ary)
         item_set_ary = (item_set **) node->nodes;
         for (i = 0; i < ary_size; i++)
         {
-            hash_index = ary[i] % HASH_FUNC_MOD;
-            if (item_set_ary[hash_index] != NULL)
-                item_set_ary[hash_index]->count++;
+            hash_index = ary[i];
+            node_offset = NODE_INDEX (node->len, hash_index);
+            if (item_set_ary[node_offset] != NULL)
+                item_set_ary[node_offset]->count++;
         }
     }
 }
@@ -416,27 +420,27 @@ ht_is_empty (ht_node *node)
 }
 
 int
-show_items_from_ht (ht_node *node)
+show_items_from_ht (ht_node *node, int item_size)
 {
     int item_num = 0;
     int i;
     ht_node **nodes_ary;
     item_set **item_set_ary;
-    if (node->len == 0) /* interior node */
+    if (node->depth != item_size - 1) /* interior node */
     {
         nodes_ary = (ht_node **) node->nodes;
-        for (i = 0; i < HASH_FUNC_MOD; i++)
+        for (i = 0; i < node->len; i++)
         {
             if (nodes_ary[i] != NULL)
             {
-                item_num += show_items_from_ht (nodes_ary[i]);
+                item_num += show_items_from_ht (nodes_ary[i], item_size);
             }
         }
     }
     else
     {
         item_set_ary = (item_set **) node->nodes;
-        for (i = 0; i < HASH_FUNC_MOD; i++)
+        for (i = 0; i < node->len; i++)
         {
             if (item_set_ary[i] != NULL)
             {
@@ -445,7 +449,7 @@ show_items_from_ht (ht_node *node)
             }
         }
         if (node->next_leaf != NULL)
-            item_num += show_items_from_ht (node->next_leaf);
+            item_num += show_items_from_ht (node->next_leaf, item_size);
     }
     return item_num;
 }

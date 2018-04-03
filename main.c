@@ -76,7 +76,7 @@ int main (int argc, char *argv[])
 
         calc_time ("Start generate L");
 
-        large_item_set = create_ht_node (0, 0);
+        large_item_set = create_ht_node (0, HASH_FUNC_MOD);
         gen_largeitemset (candidate, candidate_size - 1, large_item_set);
         free (candidate);
         if (ht_is_empty (large_item_set))
@@ -84,7 +84,7 @@ int main (int argc, char *argv[])
         else
         {
             printf ("++++++++++++++++++\n");
-            item_num += show_items_from_ht (large_item_set);
+            item_num += show_items_from_ht (large_item_set, candidate_size - 1);
             printf ("%d\n", item_num);
             printf ("++++++++++++++++++\n");
         }
@@ -92,7 +92,7 @@ int main (int argc, char *argv[])
         printf("%d ", candidate_size);
         calc_time ("Start apriori generation");
 
-        candidate = create_ht_node (0, 0);
+        candidate = create_ht_node (0, HASH_FUNC_MOD);
         apriori_gen (large_item_set, large_item_set, candidate_size - 1, candidate);
 
         calc_time ("Start count_C");
@@ -179,26 +179,29 @@ test ()
     //gen_L1_and_C2 (f, root);
     //fclose (f);
     //printf ("Test ht_insert\n");
-    int ary[] = {0, 101, 103};
-    ht_node *leaf;
-    item_set *item;
-    item = create_item_set (ary, 3);
-    leaf = create_leaf_node (item, 3);
-    int i;
-    for (i = 0; i < 10; i++)
-    {
-        ary[2] += 5;
-        item = create_item_set (ary, 3);
-        append_item_set (item, leaf);
-    }
-    ary[1] += 5;
-    for (i = 0; i < 10; i++)
-    {
-        ary[2] += 5;
-        item = create_item_set (ary, 3);
-        append_item_set (item, leaf);
-    }
-    print_ht_tree (leaf);
+    HASH_FUNC_MOD = 10;
+    int ary[] = {0, 1, 3};
+    ht_node *root;
+    root = create_ht_node (0, HASH_FUNC_MOD);
+    ht_insert (ary, 3, root, false);
+    print_ht_tree (root, 3);
+    //item_set *item;
+    //item = create_item_set (ary, 3);
+    //leaf = create_leaf_node (item, 3);
+    //int i;
+    //for (i = 0; i < 10; i++)
+    //{
+    //    ary[2] += 5;
+    //    item = create_item_set (ary, 3);
+    //    append_item_set (item, leaf);
+    //}
+    //ary[1] += 5;
+    //for (i = 0; i < 10; i++)
+    //{
+    //    ary[2] += 5;
+    //    item = create_item_set (ary, 3);
+    //    append_item_set (item, leaf);
+    //}
     //int prefix[3];
     //int i;
     //ht_node *root;
@@ -239,10 +242,10 @@ gen_largeitemset (ht_node *node, int item_size, ht_node *result_node)
     int i;
     ht_node **nodes_ary;
     item_set **item_set_ary;
-    if (node->depth != item_size - 1) /* is interior node */
+    if (node->depth != item_size - 1)
     {
         nodes_ary = (ht_node **) node->nodes;
-        for (i = 0; i < HASH_FUNC_MOD; i++)
+        for (i = 0; i < node->len; i++)
         {
             if (nodes_ary[i] != NULL)
             {
@@ -254,7 +257,7 @@ gen_largeitemset (ht_node *node, int item_size, ht_node *result_node)
     else
     {
         item_set_ary = (item_set **) node->nodes;
-        for (i = 0; i < HASH_FUNC_MOD; i++)
+        for (i = 0; i < node->len; i++)
         {
             if (item_set_ary[i] != NULL)
             {
@@ -295,7 +298,7 @@ guess_C_isCorrect (int *ary, int ary_size, ht_node *node, int item_size, int *pr
         for (i = 0; i <= ary_size - item_size + prefix_size; i++)
         {
             prefix_ary[prefix_size] = ary[i];
-            hash_index = ary[i] % HASH_FUNC_MOD;
+            hash_index = ary[i];
             childnode = (ht_node *) node->nodes[hash_index];
             if (childnode != NULL)
             {
@@ -363,16 +366,16 @@ L_combination (ht_node *large_item_set, ht_node *region_node, int item_size, ht_
     cmp_size = item_size - 1;
 
     item_set_ary = (item_set **) region_node->nodes;
-    for (node_ind = 0; node_ind < HASH_FUNC_MOD; node_ind++)
+    for (node_ind = 0; node_ind < region_node->len; node_ind++)
     {
         if (item_set_ary[node_ind] != NULL)
         {
             memcpy (guess_C, item_set_ary[node_ind]->items, sizeof (int) * item_size);
-            for (scan_ind = node_ind + 1; scan_ind < HASH_FUNC_MOD; scan_ind++)
+            for (scan_ind = node_ind + 1; scan_ind < region_node->len; scan_ind++)
             {
                 if (item_set_ary[scan_ind] != NULL)
                 {
-                    guess_C[item_size] = scan_ind;
+                    guess_C[item_size] = item_set_ary[scan_ind]->items[item_size - 1];
                     ht_insert (guess_C, item_size + 1, result_node, false);
                 }
             }
@@ -397,7 +400,7 @@ apriori_gen (ht_node *L_copy, ht_node *large_item_set, int item_size, ht_node *r
     else
     {
         nodes_ary = (ht_node **) large_item_set->nodes;
-        for (node_ind = 0; node_ind < HASH_FUNC_MOD; node_ind++)
+        for (node_ind = 0; node_ind < large_item_set->len; node_ind++)
         {
             if (nodes_ary[node_ind] != NULL)
             {
@@ -458,6 +461,7 @@ gen_L1_and_C2(FILE *f, ht_node **C2)
     int C_item[2];
     int ind;
     int c2_num;
+    int max_item = 0;
 
     /* generate C1 */
     C1 = create_tableList();
@@ -467,6 +471,8 @@ gen_L1_and_C2(FILE *f, ht_node **C2)
         for (i = 0; i < len; i++)
         {
             tableL_insert (t_ary[i], C1, true);
+            if (max_item < t_ary[i])
+                max_item = t_ary[i];
         }
         if (t_ary != NULL && len != -1)
             free (t_ary);
@@ -498,11 +504,11 @@ gen_L1_and_C2(FILE *f, ht_node **C2)
         L1 = L1->next_table;
     }
 
-    HASH_FUNC_MOD = ind;
+    HASH_FUNC_MOD = max_item + 1;
     MAX_LEAF_SIZE = 1;
     printf ("Find HASH_FUNC_MOD: %d\n", HASH_FUNC_MOD);
     printf ("Find MAX_LEAF_SIZE: %d\n", MAX_LEAF_SIZE);
-    *C2 = create_ht_node (0, 0);
+    *C2 = create_ht_node (0, HASH_FUNC_MOD);
 
     calc_time ("Start generate C2");
     /* generate C2 */
